@@ -3,8 +3,27 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import { FADE_IN_ANIMATION } from '@/lib/animation';
-import { cn } from '@/utils/cn';
 import { useAssessment } from '@/contexts/assessment-context';
+import {
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Box,
+  CircularProgress,
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+import { SarahBox } from '@/components/sarah/SarahBox';
+import { InfoBox } from '@/components/ui/InfoBox';
+import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
+
+const StyledPaper = styled(Paper)({
+  padding: 32, // theme.spacing(4)
+  borderRadius: 8,
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+  marginBottom: 24, // theme.spacing(3)
+});
 
 export function BusinessProfileStep() {
   const { dispatch } = useAssessment();
@@ -12,8 +31,35 @@ export function BusinessProfileStep() {
   const [isAnalysing, setIsAnalysing] = React.useState(false);
   const [error, setError] = React.useState('');
   
+  // Function to validate and format URL
+  const validateAndFormatUrl = (inputUrl: string): string | null => {
+    // Trim whitespace
+    let formattedUrl = inputUrl.trim();
+    
+    // Check if URL is empty
+    if (!formattedUrl) {
+      return null;
+    }
+    
+    // Add protocol if missing
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://' + formattedUrl;
+    }
+    
+    // Validate URL format
+    try {
+      new URL(formattedUrl);
+      return formattedUrl;
+    } catch (error) {
+      return null;
+    }
+  };
+  
   const handleAnalyse = async () => {
-    if (!url) {
+    // Validate and format the URL
+    const formattedUrl = validateAndFormatUrl(url);
+    
+    if (!formattedUrl) {
       setError('Please enter a valid website URL');
       return;
     }
@@ -23,11 +69,11 @@ export function BusinessProfileStep() {
     dispatch({ type: 'SET_ANALYSING', payload: true });
     
     try {
-      // Make API call to analyse the website
+      // Make API call to analyse the website with the formatted URL
       const response = await fetch('/api/extract-website', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: formattedUrl }),
       });
       
       if (!response.ok) {
@@ -53,91 +99,67 @@ export function BusinessProfileStep() {
   };
   
   return (
-    <div className="max-w-3xl mx-auto">
-      <motion.h1 
-        className="text-3xl font-bold"
+    <Container maxWidth="lg">
+      <motion.div
         initial="hidden"
         animate="visible"
         variants={FADE_IN_ANIMATION}
       >
-        Business Profile Analysis
-      </motion.h1>
-      <motion.p 
-        className="mt-2 text-gray-600"
-        initial="hidden"
-        animate="visible"
-        variants={FADE_IN_ANIMATION}
-        transition={{ delay: 0.1 }}
-      >
-        Let's start by analysing your business website to gather essential information.
-      </motion.p>
-      
-      <motion.div 
-        className="mt-6 p-4 bg-blue-600 text-white rounded-lg"
-        initial="hidden"
-        animate="visible"
-        variants={FADE_IN_ANIMATION}
-        transition={{ delay: 0.2 }}
-      >
-        <h3 className="font-semibold text-lg">Sarah - Export Consultant</h3>
-        <p className="mt-1">
-          Hi! I'm Sarah, your export consultant. I'll help analyse your website and guide you through the assessment. Please enter your business website URL below to get started.
-        </p>
-      </motion.div>
-      
-      <div className="mt-8">
-        <label htmlFor="websiteUrl" className="block text-sm font-medium text-gray-700 mb-1">
-          Business Website URL
-        </label>
-        <div className="flex">
-          <input
-            id="websiteUrl"
-            type="url"
-            placeholder="https://your-business.com"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className={cn(
-              'flex-1 p-3 border border-gray-300 rounded-lg mr-2',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent'
-            )}
-          />
-          <button
+        <StyledPaper>
+          <Typography variant="h4" component="h2" color="secondary.main" sx={{ mb: 2 }}>
+            Business Profile Analysis
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 4 }}>
+            Let's start by analyzing your business website to gather essential information.
+          </Typography>
+          
+          <SarahBox>
+            Hi! I'm Sarah, your export consultant. I'll help analyze your website and guide you through the assessment. Please enter your business website URL below to get started.
+          </SarahBox>
+          
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+              Business Website URL
+            </Typography>
+            <TextField 
+              fullWidth
+              placeholder="https://your-business.com"
+              variant="outlined"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              helperText={error || "Example: https://mysouthafricanbusiness.co.za"}
+              error={!!error}
+              sx={{ mb: 2 }}
+            />
+          </Box>
+          
+          <Button 
+            variant="contained" 
+            size="large" 
             onClick={handleAnalyse}
             disabled={!url || isAnalysing}
-            className={cn(
-              'px-6 py-2.5 rounded-lg font-medium transition-colors',
-              'bg-primary text-white hover:bg-primary/90',
-              'disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed'
+            sx={{ 
+              py: 1.5,
+              px: 4,
+              borderRadius: 1,
+              fontWeight: 'bold',
+            }}
+          >
+            {isAnalysing ? (
+              <>
+                <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                Analyzing...
+              </>
+            ) : (
+              'Analyze Website'
             )}
-          >
-            {isAnalysing ? 'Analysing...' : 'Analyse Website'}
-          </button>
-        </div>
-        {error && (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-red-500"
-          >
-            {error}
-          </motion.p>
-        )}
-      </div>
-
-      {/* Marketing Hook */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100"
-      >
-        <h3 className="text-sm font-semibold text-blue-900">Why this matters</h3>
-        <p className="mt-1 text-sm text-blue-700">
-          A thorough analysis of your business website helps us understand your current market position,
-          product offerings, and potential for international expansion. This information is crucial for
-          creating a tailored export strategy.
-        </p>
+          </Button>
+          
+          <InfoBox tooltipText="Website analysis helps us understand your export potential">
+            A thorough analysis of your business website helps us understand your current market position, product offerings, and potential for international expansion. This information is crucial for creating a tailored export strategy.
+          </InfoBox>
+        </StyledPaper>
       </motion.div>
-    </div>
+    </Container>
   );
 } 

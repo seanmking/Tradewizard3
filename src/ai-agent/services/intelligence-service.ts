@@ -687,4 +687,21 @@ export class IntelligenceService {
     
     return totalWeight > 0 ? weightedSum / totalWeight : 0;
   }
+  
+  /**
+   * Validate data using the LLM model
+   * 
+   * @param prompt - The validation prompt to send to the LLM
+   * @returns The LLM's response as a string
+   */
+  public async validateWithLLM(prompt: string): Promise<string> {
+    try {
+      // Call the AI model with the validation prompt
+      const response = await this.callAIModel(prompt);
+      return response;
+    } catch (error) {
+      logger.error(`Error in LLM validation: ${error}`);
+      throw new Error(`LLM validation failed: ${error}`);
+    }
+  }
 } 

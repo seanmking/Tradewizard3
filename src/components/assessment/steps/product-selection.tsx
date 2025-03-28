@@ -2,14 +2,63 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { FADE_IN_ANIMATION } from '@/lib/animation';
 import { useAssessment } from '@/contexts/assessment-context';
-import { cn } from '@/utils/cn';
 import type { Product } from '@/contexts/assessment-context';
+import {
+  Container,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Box,
+  Card,
+  CardContent,
+  MenuItem,
+  Switch,
+  FormControlLabel,
+  Alert,
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
+import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
+import { InfoBox } from '@/components/ui/InfoBox';
+import { SarahBox } from '@/components/sarah/SarahBox';
+import { GridContainer, GridItem } from '@/components/ui/GridWrapper';
+
+const StyledPaper = styled(Paper)({
+  padding: 32, // theme.spacing(4)
+  borderRadius: 8,
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+  marginBottom: 24, // theme.spacing(3)
+});
+
+const ProductCard = styled(Card)({
+  borderRadius: 8,
+  marginBottom: 16, // theme.spacing(2)
+  backgroundColor: '#f7fafc',
+  border: '1px solid #e2e8f0',
+});
+
+const AddProductSection = styled(Box)({
+  border: '1px dashed #e2e8f0',
+  borderRadius: 8,
+  padding: 24, // theme.spacing(3)
+  backgroundColor: '#f7fafc',
+});
+
+const productCategories = [
+  { value: 'Food & Beverage', label: 'Food & Beverage' },
+  { value: 'Manufacturing', label: 'Manufacturing' },
+  { value: 'Technology', label: 'Technology' },
+  { value: 'Textiles', label: 'Textiles' },
+  { value: 'Other', label: 'Other' }
+];
 
 export function ProductSelectionStep() {
   const { state, dispatch } = useAssessment();
-  const [selectedProducts, setSelectedProducts] = React.useState<Product[]>(
-    state.selectedProducts || []
+  const [products, setProducts] = React.useState<Product[]>(
+    state.selectedProducts.map(p => ({ ...p, selected: true })) || []
   );
   const [newProduct, setNewProduct] = React.useState<Partial<Product>>({
     name: '',
@@ -21,194 +70,229 @@ export function ProductSelectionStep() {
   React.useEffect(() => {
     const profileProducts = state.businessProfile?.products;
     
-    if (profileProducts && profileProducts.length > 0 && selectedProducts.length === 0) {
+    // If we have products from the business profile and our local state is empty
+    if (profileProducts && profileProducts.length > 0 && products.length === 0) {
       // Create new products with generated IDs
-      const extractedProducts: Product[] = profileProducts.map(p => {
+      const extractedProducts: any[] = profileProducts.map(p => {
         return {
           id: `product-${Math.random().toString(36).substr(2, 9)}`,
           name: p.name,
           description: p.description || '',
           category: p.category || 'Uncategorized',
-          specifications: p.specifications || {}
+          specifications: p.specifications || {},
+          selected: true
         };
       });
       
-      setSelectedProducts(extractedProducts);
-    }
-  }, [state.businessProfile, selectedProducts.length]);
+      setProducts(extractedProducts);
+    } 
+    // Do not create fallback products, let the UI show the "No products found" message
+  }, [state.businessProfile, products.length]);
 
   const handleAddProduct = () => {
     if (!newProduct.name || !newProduct.category) return;
 
-    const product: Product = {
+    const product: any = {
       id: `product-${Date.now()}`,
       name: newProduct.name,
       description: newProduct.description || '',
       category: newProduct.category,
       specifications: {},
+      selected: true
     };
 
-    setSelectedProducts([...selectedProducts, product]);
+    setProducts([...products, product]);
     setNewProduct({ name: '', description: '', category: '' });
   };
 
-  const handleRemoveProduct = (productId: string) => {
-    setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
+  const handleToggleProduct = (productId: string) => {
+    setProducts(products.map(product => 
+      product.id === productId ? { ...product, selected: !product.selected } : product
+    ));
   };
 
   const handleNext = () => {
+    const selectedProducts = products.filter(p => p.selected);
     if (selectedProducts.length === 0) return;
 
     dispatch({ type: 'SET_SELECTED_PRODUCTS', payload: selectedProducts });
     dispatch({ type: 'SET_STEP', payload: 3 }); // Move to next step
   };
 
+  const handleBack = () => {
+    dispatch({ type: 'SET_STEP', payload: 1 }); // Move back to previous step
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Introduction */}
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Product Selection</h2>
-        <p className="mt-2 text-gray-600">
-          Select the products you're interested in exporting. You can add multiple products and
-          provide details about each one.
-        </p>
-      </div>
-
-      {/* Product List */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Selected Products</h3>
-        
-        {selectedProducts.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">No products selected yet</p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {selectedProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="p-4 rounded-lg border border-gray-200 bg-white"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{product.name}</h4>
-                    <p className="text-sm text-gray-500">{product.category}</p>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveProduct(product.id)}
-                    className="text-red-500 hover:text-red-600"
-                  >
-                    Remove
-                  </button>
-                </div>
-                {product.description && (
-                  <p className="mt-2 text-sm text-gray-600">{product.description}</p>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Add Product Form */}
-      <div className="p-6 rounded-lg border border-gray-200 bg-gray-50 space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Add New Product</h3>
-        
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="product-name" className="block text-sm font-medium text-gray-700">
-              Product Name *
-            </label>
-            <input
-              id="product-name"
-              type="text"
-              value={newProduct.name}
-              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              className={cn(
-                'mt-1 w-full rounded-lg border border-gray-300 px-4 py-2',
-                'focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none'
-              )}
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="product-category" className="block text-sm font-medium text-gray-700">
-              Category *
-            </label>
-            <input
-              id="product-category"
-              type="text"
-              value={newProduct.category}
-              onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-              className={cn(
-                'mt-1 w-full rounded-lg border border-gray-300 px-4 py-2',
-                'focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none'
-              )}
-            />
-          </div>
-          
-          <div className="sm:col-span-2">
-            <label htmlFor="product-description" className="block text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <textarea
-              id="product-description"
-              value={newProduct.description}
-              onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-              rows={3}
-              className={cn(
-                'mt-1 w-full rounded-lg border border-gray-300 px-4 py-2',
-                'focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none'
-              )}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            onClick={handleAddProduct}
-            disabled={!newProduct.name || !newProduct.category}
-            className={cn(
-              'px-6 py-2.5 rounded-lg font-medium transition-colors',
-              'bg-primary text-white hover:bg-primary/90',
-              'disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed'
-            )}
-          >
-            Add Product
-          </button>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div className="flex justify-end mt-8">
-        <button
-          onClick={handleNext}
-          disabled={selectedProducts.length === 0}
-          className={cn(
-            'px-8 py-3 rounded-lg font-medium transition-colors',
-            'bg-primary text-white hover:bg-primary/90',
-            'disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed'
-          )}
-        >
-          Continue to Production & Market
-        </button>
-      </div>
-
-      {/* Marketing Hook */}
+    <Container maxWidth="lg">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100"
+        initial="hidden"
+        animate="visible"
+        variants={FADE_IN_ANIMATION}
       >
-        <h3 className="text-sm font-semibold text-blue-900">Why this matters</h3>
-        <p className="mt-1 text-sm text-blue-700">
-          Carefully selecting and documenting your products helps us identify their unique selling
-          points and potential in international markets. This information will be crucial for
-          developing your export strategy and meeting international standards.
-        </p>
+        <StyledPaper>
+          <Typography variant="h4" component="h2" color="secondary.main" sx={{ mb: 2 }}>
+            Product Selection
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 4 }}>
+            Select the products you're interested in exporting. We've identified these products from your website.
+          </Typography>
+          
+          <Box sx={{ mb: 3, display: 'flex', alignItems: 'flex-start' }}>
+            <Typography variant="h6" color="#2d3748" sx={{ mr: 2 }}>
+              Selected Products
+            </Typography>
+            <Alert severity="info" sx={{ ml: 2, flex: 1 }}>
+              Clear product identification is crucial for your export journey as it affects tariffs, certifications, and market access requirements.
+            </Alert>
+          </Box>
+          
+          <GridContainer spacing={3} sx={{ mb: 4 }}>
+            {products.map(product => (
+              <GridItem key={product.id} xs={12} md={6}>
+                <ProductCard>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 1 }}>
+                      {product.name}
+                    </Typography>
+                    <Typography variant="body2" color="#718096">
+                      {product.category}
+                    </Typography>
+                    <Typography variant="body2" color="#718096" sx={{ mb: 2 }}>
+                      HS Code: {product.specifications?.hsCode || 'Not available'}
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={product.selected}
+                          onChange={() => handleToggleProduct(product.id)}
+                          color="primary"
+                        />
+                      }
+                      label="Include in export assessment"
+                    />
+                  </CardContent>
+                </ProductCard>
+              </GridItem>
+            ))}
+
+            {products.length === 0 && (
+              <GridItem xs={12}>
+                <Box sx={{ p: 4, textAlign: 'center', bgcolor: '#FFF3F3', border: '1px solid #FFCDD2', borderRadius: 2 }}>
+                  <Typography variant="h6" color="error" gutterBottom>
+                    Website Analysis Error
+                  </Typography>
+                  <Typography variant="body1" color="#C62828">
+                    We couldn't extract product information from the provided website. 
+                    Please add your products manually using the form below or go back and try a different website URL.
+                  </Typography>
+                </Box>
+              </GridItem>
+            )}
+          </GridContainer>
+          
+          <AddProductSection>
+            <Typography variant="h6" color="#4a5568" sx={{ mb: 3 }}>
+              Add New Product
+            </Typography>
+            
+            <GridContainer spacing={3}>
+              <GridItem xs={12} md={6}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Product Name *
+                </Typography>
+                <TextField 
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                />
+              </GridItem>
+              
+              <GridItem xs={12} md={6}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Category *
+                </Typography>
+                <TextField 
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  select
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                >
+                  {productCategories.map(option => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </GridItem>
+              
+              <GridItem xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Product Description
+                </Typography>
+                <TextField 
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  multiline
+                  rows={2}
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                />
+              </GridItem>
+              
+              <GridItem xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddProduct}
+                  disabled={!newProduct.name || !newProduct.category}
+                >
+                  Add Product
+                </Button>
+              </GridItem>
+            </GridContainer>
+          </AddProductSection>
+
+          <InfoBox tooltipText="Choosing the right products is crucial for export success">
+            Carefully selecting and documenting your products helps us identify their unique selling
+            points and potential in international markets. This information will be crucial for
+            developing your export strategy and meeting international standards.
+          </InfoBox>
+        </StyledPaper>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4, mb: 6 }}>
+          <Button
+            variant="outlined"
+            onClick={handleBack}
+            sx={{ 
+              borderColor: 'primary.main', 
+              color: 'primary.main',
+              borderRadius: 20,
+              px: 4
+            }}
+          >
+            Back to Business Profile
+          </Button>
+          
+          <Button
+            variant="contained"
+            onClick={handleNext}
+            disabled={products.filter(p => p.selected).length === 0}
+            sx={{ 
+              backgroundColor: 'primary.main', 
+              borderRadius: 20,
+              px: 4
+            }}
+          >
+            Continue to Production Capacity
+          </Button>
+        </Box>
       </motion.div>
-    </div>
+    </Container>
   );
 } 

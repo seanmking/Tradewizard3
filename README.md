@@ -2,7 +2,27 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, set up your environment variables:
+
+1. Create a `.env.local` file in the root directory
+2. Add the following API keys:
+
+```
+# API Keys
+UN_COMTRADE_API_KEY=your_un_comtrade_api_key
+PERPLEXITY_API_KEY=your_perplexity_api_key
+OPENAI_API_KEY=your_openai_api_key
+
+# WITS API Configuration
+WITS_API_BASE_URL=https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/
+WITS_TARIFF_URL=https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/
+WITS_TRADESTATS_URL=https://wits.worldbank.org/API/V1/SDMX/V21/datasource/tradestats-trade/reporter/
+
+# Other environment variables
+NODE_ENV=development
+```
+
+Then, run the development server:
 
 ```bash
 npm run dev
@@ -28,6 +48,15 @@ To learn more about Next.js, take a look at the following resources:
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## API Integrations
+
+This application uses the following APIs:
+
+- **UN Comtrade API**: For international trade data
+- **WITS API**: For tariff and trade statistics data
+- **Perplexity API**: For enriched market intelligence data
+- **OpenAI API**: For advanced data analysis and insights
 
 ## Deploy on Vercel
 

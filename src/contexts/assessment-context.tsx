@@ -30,6 +30,7 @@ export interface Product {
   description: string;
   category: string;
   specifications: Record<string, string>;
+  selected?: boolean;
 }
 
 export interface ProductionCapacity {
@@ -39,8 +40,14 @@ export interface ProductionCapacity {
   minimumOrderQuantity: number;
 }
 
+export interface TargetMarket {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export interface MarketInfo {
-  targetMarkets: string[];
+  targetMarkets: TargetMarket[];
   existingMarkets: string[];
   competitorAnalysis: string;
 }

@@ -5,7 +5,7 @@ import { AssessmentProvider } from '@/contexts/assessment-context';
 import { AssessmentLayout } from '@/components/assessment/assessment-layout';
 import { BusinessProfileStep } from '@/components/assessment/steps/business-profile';
 import { ProductSelectionStep } from '@/components/assessment/steps/product-selection';
-import { ProductionMarketStep } from '@/components/assessment/steps/production-market';
+import { ProductionCapacityStep, MarketAssessmentStep } from '@/components/assessment/steps/production-market';
 import { CertificationsBudgetStep } from '@/components/assessment/steps/certifications-budget';
 import { useAssessment } from '@/contexts/assessment-context';
 import Script from 'next/script';
@@ -64,8 +64,10 @@ function AssessmentSteps() {
     case 2:
       return <ProductSelectionStep />;
     case 3:
-      return <ProductionMarketStep />;
+      return <ProductionCapacityStep />;
     case 4:
+      return <MarketAssessmentStep />;
+    case 5:
       return <CertificationsBudgetStep />;
     default:
       return <BusinessProfileStep />;
