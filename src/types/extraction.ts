@@ -1,16 +1,18 @@
 /**
- * Type definitions for extraction-related interfaces
+ * Extraction Types
+ * 
+ * Type definitions for extraction results and entities.
  */
 
 /**
  * The source of extracted information
  */
-export type ExtractionSource = 'website' | 'instagram' | 'facebook' | 'document' | 'pdf' | 'linkedin';
+export type ExtractionSource = 'website' | 'pdf' | 'social' | 'api';
 
 /**
  * The type of entity extracted
  */
-export type EntityType = 'business' | 'product' | 'location' | 'contact' | 'person' | 'service';
+export type EntityType = 'business' | 'product' | 'location' | 'contact' | 'person' | 'service' | 'metadata';
 
 /**
  * Status of an extraction operation
@@ -24,11 +26,14 @@ export interface ExtractedEntity {
   id: string;
   type: EntityType;
   name: string;
-  attributes: Record<string, any>;
-  rawText: string;
+  value: string;  // The primary value of the entity (e.g., business name, product name, etc.)
   confidence: number;
-  sourceSection?: string;
-  sourcePage?: string;
+  source: string;
+  verified: boolean;
+  userModified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  attributes: Record<string, any>;
 }
 
 /**

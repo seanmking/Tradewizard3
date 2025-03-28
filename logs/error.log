@@ -1,0 +1,52 @@
+[2025-03-28T02:13:18.051Z] ERROR: Error extracting from URL brownsfoods.co.za: ProtocolError: Protocol error (Page.navigate): Cannot navigate to invalid URL
+[2025-03-28T02:13:18.218Z] ERROR: Error extracting website: Failed to analyze website
+[2025-03-28T02:44:14.827Z] ERROR: Error calling Perplexity AI: AxiosError: Request failed with status code 400
+[2025-03-28T02:44:14.833Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:44:14.834Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:44:14.836Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:44:14.837Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:44:14.838Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:44:14.839Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:49:58.248Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T02:49:58.249Z] ERROR: Response status: 404
+[2025-03-28T02:49:58.249Z] ERROR: Response data: {}
+[2025-03-28T02:49:58.254Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:49:58.256Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:49:58.258Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:49:58.259Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:49:58.260Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:49:58.261Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:51:19.361Z] ERROR: Error parsing extraction response: SyntaxError: Expected double-quoted property name in JSON at position 1075
+[2025-03-28T02:53:18.848Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T02:53:18.848Z] ERROR: Response status: 404
+[2025-03-28T02:53:18.848Z] ERROR: Response data: {}
+[2025-03-28T02:53:18.852Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:53:18.853Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T02:53:18.855Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T02:53:18.856Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T03:02:37.875Z] ERROR: Error parsing extraction response: SyntaxError: Expected double-quoted property name in JSON at position 1137
+[2025-03-28T03:05:23.383Z] ERROR: Error parsing extraction response: SyntaxError: Expected double-quoted property name in JSON at position 1140
+[2025-03-28T04:03:49.343Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T04:03:49.344Z] ERROR: Response status: 404
+[2025-03-28T04:03:49.346Z] ERROR: Response data: {}
+[2025-03-28T04:03:49.351Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T04:03:49.624Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T04:03:49.625Z] ERROR: Response status: 404
+[2025-03-28T04:03:49.625Z] ERROR: Response data: {}
+[2025-03-28T04:03:49.626Z] ERROR: Error getting compliance data with Perplexity: Error: Perplexity AI call failed: Request failed with status code 404
+[2025-03-28T04:03:49.631Z] ERROR: Error calling Compliance MCP: AggregateError
+[2025-03-28T04:03:49.907Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T04:03:49.907Z] ERROR: Response status: 404
+[2025-03-28T04:03:49.907Z] ERROR: Response data: {}
+[2025-03-28T04:03:49.907Z] ERROR: Error getting compliance data with Perplexity: Error: Perplexity AI call failed: Request failed with status code 404
+[2025-03-28T04:03:49.915Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T04:03:50.184Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T04:03:50.184Z] ERROR: Response status: 404
+[2025-03-28T04:03:50.184Z] ERROR: Response data: {}
+[2025-03-28T04:03:50.184Z] ERROR: Error getting market data with Perplexity: Error: Perplexity AI call failed: Request failed with status code 404
+[2025-03-28T04:03:50.186Z] ERROR: Error calling Market Intelligence MCP: AggregateError
+[2025-03-28T04:03:50.539Z] ERROR: Error calling Perplexity AI: Request failed with status code 404
+[2025-03-28T04:03:50.540Z] ERROR: Response status: 404
+[2025-03-28T04:03:50.540Z] ERROR: Response data: {}
+[2025-03-28T04:03:50.540Z] ERROR: Error getting market data with Perplexity: Error: Perplexity AI call failed: Request failed with status code 404
+[2025-03-28T04:04:34.063Z] ERROR: Error parsing extraction response: SyntaxError: Expected double-quoted property name in JSON at position 1144

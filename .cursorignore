@@ -1,0 +1,11 @@
+# Dependency directories
+node_modules/
+.next/
+
+# Build outputs
+dist/
+build/
+
+# Large files and binary files
+*.min.js
+*.node 

@@ -1,23 +1,19 @@
 'use client';
 
 import React from 'react';
-import { useAssessment } from '../../state/assessment-context';
+import { useAssessment } from '@/contexts/assessment-context';
 import { AssessmentStep } from './AssessmentStep';
 import { WebsiteInputForm } from './WebsiteInputForm';
-import { BusinessProfile } from '../../types/business-profile.types';
+import { BusinessProfile } from '@/types/business-profile.types';
 
 export const AssessmentContainer: React.FC = () => {
-  const {
-    currentStep,
-    totalSteps,
-    setBusinessProfile,
-    nextStep,
-    prevStep,
-  } = useAssessment();
+  const { state, dispatch } = useAssessment();
+  const currentStep = state.currentStep;
+  const totalSteps = 4; // Match the number of steps in the main assessment
 
   const handleWebsiteAnalysisComplete = (profile: BusinessProfile) => {
-    setBusinessProfile(profile);
-    nextStep();
+    dispatch({ type: 'SET_BUSINESS_PROFILE', payload: profile });
+    dispatch({ type: 'SET_STEP', payload: 2 }); // Move to step 2
   };
 
   const renderStep = () => {
