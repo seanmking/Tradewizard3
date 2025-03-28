@@ -29,8 +29,15 @@ export interface Product {
   name: string;
   description: string;
   category: string;
+  categoryId: string;
+  subcategoryId: string;
   specifications: Record<string, string>;
   selected?: boolean;
+  suggestedCategory?: {
+    categoryId: string;
+    subcategoryId: string;
+    confidence: number;
+  };
 }
 
 export interface ProductionCapacity {

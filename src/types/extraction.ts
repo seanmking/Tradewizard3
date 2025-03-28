@@ -17,7 +17,7 @@ export type EntityType = 'business' | 'product' | 'location' | 'contact' | 'pers
 /**
  * Status of an extraction operation
  */
-export type ExtractionStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ExtractionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'partial';
 
 /**
  * An extracted entity with attributes and confidence score
@@ -49,6 +49,15 @@ export interface ExtractionResult {
   processingTime: number;
   status: ExtractionStatus;
   error?: string;
+  qualityMetrics?: {
+    extractionAttempts?: number;
+    hasProducts?: boolean;
+    hasBusiness?: boolean;
+    partialExtraction?: boolean;
+    errorType?: string;
+    jsonParsed?: boolean;
+    fallbackMode?: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

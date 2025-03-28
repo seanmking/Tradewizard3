@@ -1,45 +1,43 @@
 import React from 'react';
-import { Grid as MuiGrid } from '@mui/material';
+import { Grid } from '@mui/material';
+import { styled } from '@mui/material/styles';
 
-// Helper component to wrap MUI Grid with proper types
-export const Grid: React.FC<any> = (props) => {
-  return <MuiGrid {...props} />;
-};
+const StyledGrid = styled(Grid)(({ theme }) => ({
+  width: '100%',
+  margin: 0,
+  padding: theme.spacing(2),
+}));
 
-// Container component
-export const GridContainer: React.FC<React.PropsWithChildren<{
+interface GridContainerProps extends React.PropsWithChildren {
   spacing?: number;
   sx?: any;
-}>> = ({ children, spacing = 3, sx }) => {
+}
+
+interface GridItemProps extends React.PropsWithChildren {
+  gridSize?: {
+    xs?: number | boolean;
+    sm?: number | boolean;
+    md?: number | boolean;
+    lg?: number | boolean;
+    xl?: number | boolean;
+  };
+  sx?: any;
+}
+
+// Container component
+export const GridContainer: React.FC<GridContainerProps> = ({ children, spacing = 3, sx }) => {
   return (
-    <MuiGrid container spacing={spacing} sx={sx}>
+    <StyledGrid container spacing={spacing} sx={sx}>
       {children}
-    </MuiGrid>
+    </StyledGrid>
   );
 };
 
-// Item component that avoids deprecated props
-export const GridItem: React.FC<React.PropsWithChildren<{
-  xs?: number | boolean;
-  sm?: number | boolean;
-  md?: number | boolean;
-  lg?: number | boolean;
-  xl?: number | boolean;
-  sx?: any;
-}>> = ({ children, xs, sm, md, lg, xl, sx }) => {
-  // Convert deprecated grid props to className and sx based approach
-  const gridProps: any = {};
-  
-  // Only include size props if they're defined
-  if (xs !== undefined) gridProps.xs = xs;
-  if (sm !== undefined) gridProps.sm = sm;
-  if (md !== undefined) gridProps.md = md;
-  if (lg !== undefined) gridProps.lg = lg;
-  if (xl !== undefined) gridProps.xl = xl;
-  
+// Item component using Grid v2 syntax
+export const GridItem: React.FC<GridItemProps> = ({ children, gridSize, sx }) => {
   return (
-    <MuiGrid {...gridProps} sx={sx} item>
+    <Grid {...gridSize} sx={sx}>
       {children}
-    </MuiGrid>
+    </Grid>
   );
 }; 

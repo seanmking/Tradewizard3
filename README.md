@@ -1,65 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TradeWizard 3.0
 
-## Getting Started
+TradeWizard is an intelligent business analysis tool that combines advanced web scraping with AI-powered insights.
 
-First, set up your environment variables:
+## Features
 
-1. Create a `.env.local` file in the root directory
-2. Add the following API keys:
+- **Smart Web Scraping**: Tiered approach using Axios+Cheerio for static sites and Puppeteer for JavaScript-heavy pages
+- **Perplexity AI Integration**: Intelligent validation and enrichment of business data
+- **Efficient Caching**: Built-in caching system for API responses
+- **Robust Error Handling**: Comprehensive error handling and retry mechanisms
 
-```
-# API Keys
-UN_COMTRADE_API_KEY=your_un_comtrade_api_key
-PERPLEXITY_API_KEY=your_perplexity_api_key
-OPENAI_API_KEY=your_openai_api_key
+## Setup
 
-# WITS API Configuration
-WITS_API_BASE_URL=https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/
-WITS_TARIFF_URL=https://wits.worldbank.org/API/V1/SDMX/V21/datasource/TRN/reporter/
-WITS_TRADESTATS_URL=https://wits.worldbank.org/API/V1/SDMX/V21/datasource/tradestats-trade/reporter/
-
-# Other environment variables
-NODE_ENV=development
+1. Install dependencies:
+```bash
+npm install
 ```
 
-Then, run the development server:
+2. Configure environment variables:
+```bash
+# Create .env.local file
+cp .env.example .env.local
 
+# Add your Perplexity API key
+PERPLEXITY_API_KEY=your_api_key_here
+```
+
+3. Start the development server:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Web Scraping
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The system uses a tiered approach to web scraping:
+1. First attempts with Axios+Cheerio (faster, lighter)
+2. Falls back to Puppeteer for JavaScript-heavy sites
+3. Intelligent detection of when to use each method
 
-## Learn More
+### Intelligence MCP
 
-To learn more about Next.js, take a look at the following resources:
+The Intelligence MCP powered by Perplexity AI:
+1. Validates extracted business and product information
+2. Enriches data with additional details
+3. Provides confidence scores for extracted information
+4. Implements caching and retry mechanisms
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Usage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```typescript
+// Example usage of the scraping service
+const scraper = new ScrapingService();
+const result = await scraper.scrapeUrl('https://example.com');
 
-## API Integrations
+// Example usage of the Intelligence MCP
+const intelligenceMCP = new IntelligenceMCPService();
+const enrichedData = await intelligenceMCP.enrichBusinessData({
+  sourceUrl: 'https://example.com',
+  extractedEntities: [/* ... */]
+});
+```
 
-This application uses the following APIs:
+## Error Handling
 
-- **UN Comtrade API**: For international trade data
-- **WITS API**: For tariff and trade statistics data
-- **Perplexity API**: For enriched market intelligence data
-- **OpenAI API**: For advanced data analysis and insights
+The system includes comprehensive error handling:
+- Automatic retries with exponential backoff
+- Fallback mechanisms for failed scraping attempts
+- Detailed logging of errors and warnings
+- Cache management for failed requests
 
-## Deploy on Vercel
+## Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+This project is proprietary software. All rights reserved.

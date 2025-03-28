@@ -4,7 +4,8 @@ export interface MarketSize {
   value: number;
   currency: string;
   year: number;
-  growthRate?: number;
+  growthRate: number;
+  categoryBreakdown?: Record<string, number>;
 }
 
 export interface Competitor {

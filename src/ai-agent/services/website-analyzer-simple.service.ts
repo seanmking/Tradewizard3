@@ -117,25 +117,48 @@ export class WebsiteAnalyzerService {
    * @returns The detected industry
    */
   private detectIndustry($: cheerio.CheerioAPI): string {
-    const pageText = $('body').text().toLowerCase();
+    // Get text from high-priority elements first
+    const metaDescription = $('meta[name="description"]').attr('content') || '';
+    const h1Text = $('h1').text().toLowerCase();
+    const titleText = $('title').text().toLowerCase();
+    const headerText = $('header').text().toLowerCase();
+    
+    // Combine with more weight on important elements
+    const pageText = `${metaDescription.repeat(3)} ${titleText.repeat(2)} ${h1Text.repeat(2)} ${headerText} ${$('body').text()}`.toLowerCase();
     
     const industryKeywords: Record<string, string[]> = {
-      'Retail': ['retail', 'shop', 'store', 'ecommerce', 'buy', 'product', 'purchase'],
-      'Technology': ['software', 'technology', 'digital', 'app', 'tech', 'it', 'development'],
-      'Food & Beverage': ['food', 'restaurant', 'catering', 'beverage', 'cafe', 'coffee', 'drink'],
-      'Manufacturing': ['manufacture', 'factory', 'production', 'producer', 'industrial'],
-      'Healthcare': ['health', 'medical', 'doctor', 'clinic', 'patient', 'hospital'],
-      'Finance': ['finance', 'bank', 'insurance', 'investment', 'loan', 'mortgage'],
-      'Education': ['education', 'school', 'university', 'course', 'learn', 'student', 'training']
+      'Fashion & Apparel': ['fashion', 'clothing', 'apparel', 'wear', 'shoes', 'footwear', 'accessories', 'boutique', 'style', 'designer'],
+      'Beauty & Cosmetics': ['beauty', 'cosmetics', 'makeup', 'skincare', 'hair', 'salon', 'spa', 'perfume', 'fragrance'],
+      'Food & Beverage': ['food', 'restaurant', 'catering', 'beverage', 'cafe', 'coffee', 'drink', 'cuisine', 'menu', 'dining'],
+      'Alcoholic Beverages': ['wine', 'liquor', 'spirits', 'beer', 'brewery', 'distillery', 'cocktail', 'alcohol', 'bar'],
+      'Retail': ['retail', 'shop', 'store', 'ecommerce', 'buy', 'product', 'purchase', 'mall', 'outlet'],
+      'Technology': ['software', 'technology', 'digital', 'app', 'tech', 'it', 'development', 'computer', 'online'],
+      'Manufacturing': ['manufacture', 'factory', 'production', 'producer', 'industrial', 'supplier', 'wholesale'],
+      'Healthcare': ['health', 'medical', 'doctor', 'clinic', 'patient', 'hospital', 'wellness', 'pharmacy'],
+      'Finance': ['finance', 'bank', 'insurance', 'investment', 'loan', 'mortgage', 'trading', 'fintech'],
+      'Education': ['education', 'school', 'university', 'course', 'learn', 'student', 'training', 'academy']
     };
     
     let detectedIndustry = 'Other';
-    let maxKeywords = 0;
+    let maxScore = 0;
     
     for (const [industry, keywords] of Object.entries(industryKeywords)) {
-      const matchCount = keywords.filter(keyword => pageText.includes(keyword)).length;
-      if (matchCount > maxKeywords) {
-        maxKeywords = matchCount;
+      let score = 0;
+      for (const keyword of keywords) {
+        // Count occurrences and weight them
+        const count = (pageText.match(new RegExp(keyword, 'g')) || []).length;
+        if (count > 0) {
+          // Higher weight for keywords in meta, title, and h1
+          if (metaDescription.includes(keyword)) score += 3;
+          if (titleText.includes(keyword)) score += 2;
+          if (h1Text.includes(keyword)) score += 2;
+          // Regular weight for other occurrences
+          score += count;
+        }
+      }
+      
+      if (score > maxScore) {
+        maxScore = score;
         detectedIndustry = industry;
       }
     }
@@ -241,16 +264,48 @@ export class WebsiteAnalyzerService {
     const text = `${name} ${description}`.toLowerCase();
     
     const categoryKeywords: Record<string, string[]> = {
-      'Electronics': ['electronic', 'device', 'gadget', 'tech', 'computer', 'phone', 'smartphone', 'laptop'],
-      'Clothing': ['shirt', 'pants', 'dress', 'clothing', 'apparel', 'wear', 'fashion', 'jacket'],
-      'Food': ['food', 'snack', 'meal', 'drink', 'beverage', 'ingredient', 'recipe'],
-      'Home & Garden': ['home', 'garden', 'furniture', 'decor', 'kitchen', 'outdoor', 'indoor'],
-      'Beauty & Health': ['beauty', 'health', 'cosmetic', 'skin', 'hair', 'makeup', 'care'],
-      'Toys & Games': ['toy', 'game', 'play', 'puzzle', 'board game', 'entertainment'],
+      'Fashion & Apparel': [
+        'dress', 'shirt', 'pants', 'clothing', 'apparel', 'wear', 'fashion', 'jacket',
+        'shoes', 'boots', 'sneakers', 'footwear', 'sandals', 'heels', 'accessories',
+        'handbag', 'purse', 'jewelry', 'watch', 'designer', 'boutique', 'collection'
+      ],
+      'Beauty & Cosmetics': [
+        'beauty', 'cosmetic', 'makeup', 'skin', 'hair', 'care', 'perfume', 'fragrance',
+        'lotion', 'cream', 'serum', 'lipstick', 'mascara', 'foundation', 'powder',
+        'shampoo', 'conditioner', 'treatment', 'spa', 'salon'
+      ],
+      'Food & Beverage': [
+        'food', 'snack', 'meal', 'drink', 'beverage', 'ingredient', 'recipe',
+        'organic', 'natural', 'fresh', 'gourmet', 'cuisine', 'specialty'
+      ],
+      'Alcoholic Beverages': [
+        'wine', 'liquor', 'spirit', 'beer', 'vodka', 'whiskey', 'gin', 'rum',
+        'tequila', 'champagne', 'cocktail', 'brewery', 'distillery', 'vintage'
+      ],
+      'Home & Garden': [
+        'home', 'garden', 'furniture', 'decor', 'kitchen', 'outdoor', 'indoor',
+        'appliance', 'lighting', 'bedding', 'storage', 'tools'
+      ],
+      'Electronics': [
+        'electronic', 'device', 'gadget', 'tech', 'computer', 'phone', 'smartphone',
+        'laptop', 'tablet', 'camera', 'audio', 'video', 'gaming'
+      ]
     };
     
+    // Check for exact matches first
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
       if (keywords.some(keyword => text.includes(keyword))) {
+        return category;
+      }
+    }
+    
+    // If no exact match, check for partial matches
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => 
+        text.split(' ').some(word => 
+          word.includes(keyword) || keyword.includes(word)
+        )
+      )) {
         return category;
       }
     }

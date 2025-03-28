@@ -25,14 +25,16 @@ import {
   Avatar,
   Divider,
   Checkbox,
-  MenuItem
+  MenuItem,
+  CircularProgress,
+  Grid
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { SarahBox } from '@/components/sarah/SarahBox';
 import { InfoBox } from '@/components/ui/InfoBox';
-import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
 import { CountryFlag } from '@/components/ui/CountryFlag';
 import { GridContainer, GridItem } from '@/components/ui/GridWrapper';
+import { MarketCard as MarketCardComponent } from '@/components/ui/MarketCard';
 
 const StyledPaper = styled(Paper)({
   padding: 32, // theme.spacing(4)
@@ -66,6 +68,17 @@ const MarketCard = styled(Card)({
   backgroundColor: '#f7fafc',
   border: '1px solid #e2e8f0',
 });
+
+interface Market {
+  id: string;
+  name: string;
+  flag: string;
+  marketSize: string;
+  growthRate: string;
+  saExports: string;
+  tariff: string;
+  selected: boolean;
+}
 
 // Production Capacity Step
 export function ProductionCapacityStep() {
@@ -415,77 +428,157 @@ export function ProductionCapacityStep() {
 // Market Assessment Step
 export function MarketAssessmentStep() {
   const { state, dispatch } = useAssessment();
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   
-  const [markets, setMarkets] = React.useState([
-    {
-      id: 'uae',
-      name: 'United Arab Emirates',
-      flag: 'ae',
-      marketSize: '$4.2B (Food & Beverage)',
-      growthRate: '8.3% annually',
-      saExports: '$340M (2024)',
-      tariff: '0-5% for your products',
-      selected: false
-    },
-    {
-      id: 'usa',
-      name: 'United States',
-      flag: 'us',
-      marketSize: '$765B (Food & Beverage)',
-      growthRate: '3.5% annually',
-      saExports: '$2.1B (2024)',
-      tariff: '0-10% for your products',
-      selected: false
-    },
-    {
-      id: 'uk',
-      name: 'United Kingdom',
-      flag: 'gb',
-      marketSize: '$89B (Food & Beverage)',
-      growthRate: '2.8% annually',
-      saExports: '$900M (2024)',
-      tariff: '0-15% for your products',
-      selected: false
-    },
-    {
-      id: 'sadc',
-      name: 'SADC Countries',
-      flag: 'sadc', // Will render a special SADC logo or icon
-      marketSize: '$125B (Food & Beverage)',
-      growthRate: '7.2% annually',
-      saExports: '$12.5B (2024)',
-      tariff: '0-5% under SADC Trade Protocol',
-      selected: true
-    },
-  ]);
-  
+  // Initialize markets state
+  const [markets, setMarkets] = React.useState<Market[]>([]);
   const [competitorAnalysis, setCompetitorAnalysis] = React.useState('');
-  
-  // Initialize with existing values from context if available
-  React.useEffect(() => {
-    if (state.marketInfo && state.marketInfo.targetMarkets && state.marketInfo.targetMarkets.length > 0) {
-      // Update local markets state with selected state from context
-      setMarkets(prevMarkets => {
-        return prevMarkets.map(market => {
-          const isSelected = state.marketInfo.targetMarkets.some(
-            targetMarket => targetMarket.id === market.id
-          );
-          return { ...market, selected: isSelected };
-        });
-      });
-    }
-    
-    if (state.marketInfo && state.marketInfo.competitorAnalysis) {
-      setCompetitorAnalysis(state.marketInfo.competitorAnalysis);
-    }
-  }, [state.marketInfo]);
-  
-  // Toggle market selection
-  const handleToggleMarket = (id: string) => {
-    setMarkets(markets.map(market => 
-      market.id === id ? { ...market, selected: !market.selected } : market
-    ));
+
+  // Get selected product categories
+  const getSelectedCategories = () => {
+    if (!state.selectedProducts) return [];
+    return Array.from(new Set(state.selectedProducts.map(p => p.category)));
   };
+
+  // Fetch market data when products or their categories change
+  React.useEffect(() => {
+    const fetchMarketData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const categories = getSelectedCategories();
+        if (categories.length === 0) {
+          setError('Please select products and their categories first');
+          return;
+        }
+
+        // Use uppercase market codes to match backend expectations
+        const marketCodes = ['UAE', 'US', 'GB', 'SADC'];
+        const marketData: Market[] = [];
+
+        for (const code of marketCodes) {
+          try {
+            // Call MarketIntelligenceMCP for each market
+            const response = await fetch('/api/market-intelligence', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                marketCode: code,
+                productCategories: categories,
+                businessProfile: state.businessProfile
+              })
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch market data');
+            
+            const data = await response.json();
+            const marketDataResponse = data[code] || {}; // Renamed from marketData to marketDataResponse
+            
+            // Validate market size data
+            const marketSizeValue = marketDataResponse?.marketSize?.value ?? 0;
+            const marketSizeGrowthRate = marketDataResponse?.marketSize?.growthRate ?? 0;
+            
+            const marketSize = new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: 'USD',
+              notation: 'compact',
+              maximumFractionDigits: 1
+            }).format(marketSizeValue);
+
+            marketData.push({
+              id: code.toLowerCase(),
+              name: getMarketName(code.toLowerCase()),
+              flag: code.toLowerCase(),
+              marketSize: `${marketSize} (${categories.join(', ')})`,
+              growthRate: `${marketSizeGrowthRate.toFixed(1)}% annually`,
+              saExports: formatExports(marketSizeValue, code.toLowerCase()),
+              tariff: formatTariffs(marketDataResponse.tariffs, categories),
+              selected: code === 'SADC' // Default SADC selected
+            });
+          } catch (error) {
+            console.error(`Error fetching data for market ${code}:`, error);
+            // Use fallback data for this market
+            marketData.push(getFallbackMarketData(code.toLowerCase()));
+          }
+        }
+
+        setMarkets(marketData);
+      } catch (error) {
+        console.error('Error fetching market data:', error);
+        setError('Failed to load market data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMarketData();
+  }, [state.selectedProducts, state.businessProfile]);
+
+  // Helper functions
+  const getMarketName = (code: string) => {
+    const names: Record<string, string> = {
+      'uae': 'United Arab Emirates',
+      'usa': 'United States',
+      'uk': 'United Kingdom',
+      'sadc': 'SADC Countries'
+    };
+    return names[code] || code.toUpperCase();
+  };
+
+  const formatExports = (marketSize: number, code: string) => {
+    const exportPercentages: Record<string, number> = {
+      'uae': 0.08,  // 8% market share
+      'usa': 0.003, // 0.3% market share
+      'uk': 0.01,   // 1% market share
+      'sadc': 0.1   // 10% market share
+    };
+    
+    const exports = marketSize * (exportPercentages[code] || 0.01);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(exports) + ' (2024)';
+  };
+
+  const formatTariffs = (tariffs: Record<string, any>, categories: string[]) => {
+    if (!tariffs || Object.keys(tariffs).length === 0) {
+      return getFallbackTariff(categories[0]);
+    }
+
+    const rates = Object.values(tariffs).map(t => t.rate);
+    const min = Math.min(...rates);
+    const max = Math.max(...rates);
+    
+    if (min === max) {
+      return `${min}% for your products`;
+    }
+    return `${min}-${max}% for your products`;
+  };
+
+  const getFallbackTariff = (category: string) => {
+    const fallbackRates: Record<string, string> = {
+      'uae': '0-5%',
+      'usa': '0-10%',
+      'uk': '0-15%',
+      'sadc': '0-5%'
+    };
+    return fallbackRates[category] || '0-10%';
+  };
+
+  const getFallbackMarketData = (code: string): Market => ({
+    id: code,
+    name: getMarketName(code),
+    flag: code === 'sadc' ? 'sadc' : code,
+    marketSize: '$4.2B (Food & Beverage)',
+    growthRate: '8.3% annually',
+    saExports: '$340M (2024)',
+    tariff: '0-5% for your products',
+    selected: code === 'sadc'
+  });
 
   const handleNext = () => {
     // Create proper market objects with id, code, and name
@@ -509,6 +602,13 @@ export function MarketAssessmentStep() {
 
   const handleBack = () => {
     dispatch({ type: 'SET_STEP', payload: 3 }); // Move back to Production Capacity
+  };
+
+  // Toggle market selection
+  const handleToggleMarket = (id: string) => {
+    setMarkets(markets.map(market => 
+      market.id === id ? { ...market, selected: !market.selected } : market
+    ));
   };
 
   return (
@@ -535,104 +635,32 @@ export function MarketAssessmentStep() {
             Available Export Markets
           </Typography>
           
-          <GridContainer spacing={3} sx={{ mb: 4 }}>
-            {markets.map(market => (
-              <GridItem key={market.id} xs={12} md={6}>
-                <MarketCard>
-                  <CardHeader
-                    avatar={
-                      <Box sx={{ width: 60, height: 40, borderRadius: 1, overflow: 'hidden' }}>
-                        {market.id === 'sadc' ? (
-                          <Box 
-                            sx={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              backgroundColor: '#f0f4f8',
-                              color: '#4a5568',
-                              fontWeight: 'bold',
-                              fontSize: '0.75rem',
-                              border: '1px solid #cbd5e0'
-                            }}
-                          >
-                            SADC
-                          </Box>
-                        ) : (
-                          <CountryFlag countryCode={market.flag} />
-                        )}
-                      </Box>
-                    }
-                    title={
-                      <Typography variant="h6">{market.name}</Typography>
-                    }
-                  />
-                  <Divider />
-                  <CardContent>
-                    {market.id === 'sadc' && (
-                      <Box sx={{ mb: 2, fontSize: '0.875rem', color: 'text.secondary' }}>
-                        Includes Angola, Botswana, Comoros, DRC, Eswatini, Lesotho, Madagascar, Malawi, 
-                        Mauritius, Mozambique, Namibia, Seychelles, South Africa, Tanzania, Zambia, and Zimbabwe
-                      </Box>
-                    )}
-                    
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
-                        Market Size:
-                      </Typography>
-                      <Typography variant="body2" component="span">
-                        {market.marketSize}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
-                        Growth Rate:
-                      </Typography>
-                      <Typography variant="body2" component="span">
-                        {market.growthRate}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
-                        SA Exports:
-                      </Typography>
-                      <Typography variant="body2" component="span">
-                        {market.saExports}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" component="span" sx={{ fontWeight: 'bold', mr: 1 }}>
-                        Tariff:
-                      </Typography>
-                      <Typography variant="body2" component="span">
-                        {market.tariff}
-                      </Typography>
-                    </Box>
-                    
-                    <FormControlLabel
-                      control={
-                        <Checkbox 
-                          checked={market.selected}
-                          onChange={() => handleToggleMarket(market.id)}
-                          sx={{ 
-                            color: 'primary.main',
-                            '&.Mui-checked': {
-                              color: 'primary.main',
-                            },
-                          }}
-                        />
-                      }
-                      label="Select"
+          {loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {error && (
+            <Box sx={{ mb: 3, color: 'error.main' }}>
+              <Typography>{error}</Typography>
+            </Box>
+          )}
+
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 4 }}>
+              <GridContainer spacing={3}>
+                {markets.map(market => (
+                  <GridItem key={market.id} xs={12} sm={6} md={4}>
+                    <MarketCardComponent 
+                      market={market}
+                      onToggle={handleToggleMarket}
                     />
-                  </CardContent>
-                </MarketCard>
-              </GridItem>
-            ))}
-          </GridContainer>
+                  </GridItem>
+                ))}
+              </GridContainer>
+            </Box>
+          </Box>
           
           <Box sx={{ mb: 3 }}>
             <Typography variant="h6" sx={{ mb: 2 }}>

@@ -176,7 +176,252 @@ export class ComplianceMCPService implements ComplianceMCP {
     return 'TOTAL'; // TOTAL will get all HS codes
   }
   
+  private getFoodProductRequirements(marketCode: string): ComplianceRequirement[] {
+    const requirements: ComplianceRequirement[] = [
+      {
+        id: 'food-export-base',
+        name: 'Food Export Base Requirements',
+        description: 'Base requirements for food product exports from South Africa',
+        isRequired: true,
+        estimatedCost: {
+          min: 175,
+          max: 500,
+          currency: 'ZAR'
+        },
+        estimatedTimelineInDays: 7,
+        countryCode: 'ZA',
+        regulatoryBody: 'Multiple SA Authorities',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        exporterRegistration: {
+          sarsRegistrationRequired: true,
+          itacPermitRequired: false,
+          facilityCertificationRequired: true,
+          haccp: {
+            required: true,
+            level: 'Full HACCP Implementation'
+          },
+          halal: {
+            required: false,
+            acceptedCertifiers: ['SANHA', 'MJC']
+          }
+        },
+        marketSpecificCompliance: [
+          {
+            countryCode: 'AE',
+            labeling: {
+              nutritionLabelMandatory: false,
+              requiredLanguages: ['Arabic', 'English'],
+              specializedLabels: [
+                {
+                  type: 'Halal',
+                  required: true,
+                  details: 'Must display Halal certification mark'
+                }
+              ],
+              shelfLifeMonths: 24,
+              ingredientRestrictions: {
+                hasBannedIngredients: true,
+                bannedList: ['Pork', 'Pork derivatives', 'Alcohol']
+              }
+            },
+            marketRequirements: {
+              halalCertificationMandatory: true,
+              organicCertificationRequired: false,
+              productTestingRequired: false,
+              foodSafetyCertifications: ['HACCP']
+            },
+            tariffAndTrade: {
+              tariffRatePercentage: 5,
+              hasQuotaRestrictions: false,
+              hasProductBans: false
+            },
+            customs: {
+              exportHealthCertificateRequired: true,
+              phytosanitaryCertificateRequired: false,
+              preShipmentInspectionRequired: true,
+              electronicFilingMandatory: true
+            }
+          },
+          {
+            countryCode: 'US',
+            labeling: {
+              nutritionLabelMandatory: true,
+              requiredLanguages: ['English'],
+              specializedLabels: [
+                {
+                  type: 'FDA',
+                  required: true,
+                  details: 'FDA compliant nutrition facts panel'
+                }
+              ],
+              ingredientRestrictions: {
+                hasBannedIngredients: true,
+                bannedList: ['Unapproved additives', 'Non-FDA compliant ingredients']
+              }
+            },
+            marketRequirements: {
+              halalCertificationMandatory: false,
+              organicCertificationRequired: false,
+              productTestingRequired: true,
+              testingTypes: ['FDA compliance testing', 'Microbiological analysis'],
+              foodSafetyCertifications: ['HACCP', 'FSMA compliance']
+            },
+            tariffAndTrade: {
+              tariffRatePercentage: 2.5,
+              hasQuotaRestrictions: false,
+              hasProductBans: false
+            },
+            customs: {
+              exportHealthCertificateRequired: true,
+              phytosanitaryCertificateRequired: true,
+              preShipmentInspectionRequired: false,
+              electronicFilingMandatory: true,
+              additionalDocuments: ['Prior Notice of Imported Foods']
+            }
+          },
+          {
+            countryCode: 'GB',
+            labeling: {
+              nutritionLabelMandatory: true,
+              requiredLanguages: ['English'],
+              specializedLabels: [
+                {
+                  type: 'HFSS',
+                  required: true,
+                  details: 'High in Fat, Salt or Sugar labeling if applicable'
+                }
+              ],
+              ingredientRestrictions: {
+                hasBannedIngredients: true,
+                bannedList: ['Unapproved additives', 'Non-UK/EU compliant ingredients']
+              }
+            },
+            marketRequirements: {
+              halalCertificationMandatory: false,
+              organicCertificationRequired: false,
+              productTestingRequired: true,
+              testingTypes: ['UK compliance testing', 'Nutritional analysis'],
+              foodSafetyCertifications: ['HACCP', 'BRC optional but recommended']
+            },
+            tariffAndTrade: {
+              tariffRatePercentage: 0,
+              hasQuotaRestrictions: false,
+              hasProductBans: false
+            },
+            customs: {
+              exportHealthCertificateRequired: true,
+              phytosanitaryCertificateRequired: true,
+              preShipmentInspectionRequired: false,
+              electronicFilingMandatory: true
+            }
+          }
+        ]
+      }
+    ];
+
+    // Add existing specific certification requirements
+    requirements.push(...this.getBaseCertificationRequirements());
+    
+    return requirements;
+  }
+  
+  private getBaseCertificationRequirements(): ComplianceRequirement[] {
+    return [
+      {
+        id: 'haccp-cert',
+        name: 'HACCP Certification',
+        description: 'Hazard Analysis Critical Control Points certification for food safety',
+        isRequired: true,
+        estimatedCost: {
+          min: 45000,
+          max: 75000,
+          currency: 'ZAR'
+        },
+        estimatedTimelineInDays: 180,
+        countryCode: 'ZA',
+        regulatoryBody: 'Department of Agriculture, Land Reform and Rural Development (DALRRD)',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        documentationNeeded: ['Food safety manual', 'Process flow diagrams', 'Hazard analysis documentation'],
+        referenceUrl: 'https://www.dalrrd.gov.za/'
+      },
+      {
+        id: 'fda-compliance',
+        name: 'FDA/EFSA Compliance',
+        description: 'Compliance with U.S. FDA and European Food Safety Authority requirements',
+        isRequired: true,
+        estimatedCost: {
+          min: 8000,
+          max: 25000,
+          currency: 'USD' // Using USD as base currency
+        },
+        estimatedTimelineInDays: 240,
+        countryCode: 'INTL',
+        regulatoryBody: 'U.S. FDA / European Food Safety Authority',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        documentationNeeded: ['Product formulation', 'Lab test results', 'Manufacturing process documentation'],
+        referenceUrl: 'https://www.fda.gov/food/exporting-food-products-united-states/export-certification'
+      },
+      {
+        id: 'facility-hygiene',
+        name: 'Facility Hygiene Certification',
+        description: 'Certification of facility hygiene standards',
+        isRequired: true,
+        estimatedCost: {
+          min: 15000,
+          max: 25000,
+          currency: 'ZAR'
+        },
+        estimatedTimelineInDays: 90,
+        countryCode: 'ZA',
+        regulatoryBody: 'National Regulator for Compulsory Specifications (NRCS)',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        documentationNeeded: ['Facility layout', 'Cleaning procedures', 'Staff training records'],
+        referenceUrl: 'https://www.nrcs.org.za/services/food-safety/'
+      },
+      {
+        id: 'product-specs',
+        name: 'Product Specification Sheets',
+        description: 'Detailed product specifications and testing',
+        isRequired: true,
+        estimatedCost: {
+          min: 5000,
+          max: 10000,
+          currency: 'ZAR'
+        },
+        estimatedTimelineInDays: 30,
+        countryCode: 'ZA',
+        regulatoryBody: 'South African Bureau of Standards (SABS)',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        documentationNeeded: ['Product composition', 'Nutritional information', 'Packaging specifications'],
+        referenceUrl: 'https://www.sabs.co.za'
+      },
+      {
+        id: 'vat-registration',
+        name: 'VAT Registration',
+        description: 'Value Added Tax registration for businesses',
+        isRequired: false, // Only required if turnover exceeds R1 million
+        estimatedCost: {
+          min: 0,
+          max: 0,
+          currency: 'ZAR'
+        },
+        estimatedTimelineInDays: 21,
+        countryCode: 'ZA',
+        regulatoryBody: 'South African Revenue Service (SARS)',
+        productCategories: ['Food Products - Frozen/Canned Goods', 'Food Products - Processed Foods'],
+        documentationNeeded: ['Business registration', 'Financial projections', 'Bank account details'],
+        referenceUrl: 'https://www.sars.gov.za/types-of-tax/value-added-tax/register-for-vat/'
+      }
+    ];
+  }
+  
   private getCategorySpecificRequirements(category: string, marketCode: string): ComplianceRequirement[] {
+    // For food products, use our detailed requirements
+    if (category.includes('Food Products')) {
+      return this.getFoodProductRequirements(marketCode);
+    }
+    
+    // For other categories, use existing logic
     const requirements: ComplianceRequirement[] = [];
     
     // Food products

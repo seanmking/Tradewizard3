@@ -148,7 +148,7 @@ export class WebsiteExtractor {
   private async extractWithPuppeteer(url: string): Promise<string> {
     try {
       this.browser = await puppeteer.launch({
-        headless: true,
+        headless: 'new',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
       

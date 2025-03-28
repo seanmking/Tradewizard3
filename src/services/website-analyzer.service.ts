@@ -17,23 +17,35 @@ export class WebsiteAnalyzerService {
       },
       perplexityAI: {
         apiKey: process.env.PERPLEXITY_API_KEY || '',
-        url: process.env.PERPLEXITY_API_URL || 'https://api.perplexity.ai/v1/chat/completions',
-        model: process.env.PERPLEXITY_API_MODEL || 'sonar-medium-online'
+        url: 'https://api.perplexity.ai/chat/completions'
+      },
+      mcpConfig: {
+        complianceMcpUrl: process.env.COMPLIANCE_MCP_URL || 'http://localhost:3001/api/compliance',
+        marketIntelligenceMcpUrl: process.env.MARKET_INTELLIGENCE_MCP_URL || 'http://localhost:3002/api/market-intelligence',
+        enableCrossReferencing: process.env.ENABLE_CROSS_REFERENCING === 'true'
       }
     };
+
+    // Validate required API keys
+    if (!defaultConfig.aiModel.apiKey) {
+      logger.error('OpenAI API key is missing');
+    }
+    if (!defaultConfig.perplexityAI.apiKey) {
+      logger.error('Perplexity API key is missing');
+    }
+
     this.llmExtractor = new LLMWebsiteExtractor(defaultConfig);
   }
 
   /**
-   * Extracts business information from a website using LLM analysis
-   * @param url The website URL to analyze
+   * Analyze a website and extract business information
+   * @param url The URL of the website to analyze
    * @returns A Promise containing the business profile data
    */
   async extractBusinessInfo(url: string): Promise<BusinessProfile> {
     try {
-      // Properly format the URL to ensure it has a protocol
+      // Format the URL to ensure it has a protocol
       const formattedUrl = this.formatUrl(url);
-      logger.info(`Formatted URL for extraction with LLM: ${formattedUrl}`);
       
       // Use the LLM extractor to get detailed website information
       const extractionResult: ExtractionResult = await this.llmExtractor.extract(formattedUrl);
@@ -45,8 +57,26 @@ export class WebsiteAnalyzerService {
     } catch (error) {
       logger.error('Error analyzing website with LLM:', error);
       
-      // Return fallback data in case of error
-      return this.createFallbackBusinessProfile(url);
+      // Return minimal data from URL instead of fallback mock data
+      const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+      const businessName = domain
+        .split('.')
+        .slice(0, -1)
+        .join('.')
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+        
+      return {
+        name: businessName || 'Unknown Business',
+        description: `Website extraction error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or enter business details manually.`,
+        industry: 'Unknown',
+        products: [], // Empty products array, but not mocked data
+        websiteUrl: url,
+        extractedAt: new Date(),
+        location: {},
+        contactInfo: {}
+      };
     }
   }
   
@@ -57,17 +87,23 @@ export class WebsiteAnalyzerService {
    * @returns BusinessProfile
    */
   private convertToBusinessProfile(result: ExtractionResult, url: string): BusinessProfile {
+    // Ensure extractedEntities exists and is an array
+    const entities = Array.isArray(result.extractedEntities) ? result.extractedEntities : [];
+    
     // Get business entity
-    const businessEntity = result.extractedEntities.find(entity => entity.type === 'business');
+    const businessEntity = entities.find(entity => entity.type === 'business');
     
     // Get product entities
-    const productEntities = result.extractedEntities.filter(entity => entity.type === 'product');
+    const productEntities = entities.filter(entity => entity.type === 'product');
     
     // Get location entity
-    const locationEntity = result.extractedEntities.find(entity => entity.type === 'location');
+    const locationEntity = entities.find(entity => entity.type === 'location');
     
     // Get contact entities
-    const contactEntities = result.extractedEntities.filter(entity => entity.type === 'contact');
+    const contactEntities = entities.filter(entity => entity.type === 'contact');
+    
+    // Log extraction quality
+    logger.info(`Extraction quality: Business: ${Boolean(businessEntity)}, Products: ${productEntities.length}, Contacts: ${contactEntities.length}`);
     
     // Format products
     const products = productEntities.map(product => ({
@@ -80,20 +116,20 @@ export class WebsiteAnalyzerService {
     // Format contact info
     const contactInfo: any = {};
     contactEntities.forEach(contact => {
-      if (contact.name === 'email' || contact.name === 'Email') {
+      if (contact.name.toLowerCase().includes('email')) {
         contactInfo.email = contact.value;
-      } else if (contact.name === 'phone' || contact.name === 'Phone') {
+      } else if (contact.name.toLowerCase().includes('phone')) {
         contactInfo.phone = contact.value;
-      } else if (contact.name === 'address' || contact.name === 'Address') {
+      } else if (contact.name.toLowerCase().includes('address')) {
         contactInfo.address = contact.value;
       }
     });
     
-    // Create business profile
+    // Create business profile - should always have a business entity now
     return {
       name: businessEntity?.name || 'Unknown Business',
-      description: businessEntity?.attributes.description || 'No description available',
-      industry: businessEntity?.attributes.businessType || '',
+      description: businessEntity?.attributes?.description || `Business operating at ${url}`,
+      industry: businessEntity?.attributes?.businessType || 'General Business',
       products: products,
       websiteUrl: url,
       extractedAt: new Date(),
@@ -124,41 +160,5 @@ export class WebsiteAnalyzerService {
       logger.error(`Invalid URL format: ${url}`);
       throw new Error('Invalid URL format. Please enter a valid website address.');
     }
-  }
-  
-  /**
-   * Create a fallback business profile when extraction fails
-   * @param url The website URL
-   * @returns A basic business profile with minimal information
-   */
-  private createFallbackBusinessProfile(url: string): BusinessProfile {
-    // Extract domain name for business name
-    let domain = '';
-    try {
-      const formattedUrl = this.formatUrl(url);
-      domain = new URL(formattedUrl).hostname;
-    } catch {
-      domain = url.split('/')[0];
-    }
-    
-    // Remove TLD and format domain as business name
-    const businessName = domain
-      .split('.')
-      .slice(0, -1)
-      .join('.')
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-      
-    return {
-      name: businessName || 'Unknown Business',
-      description: 'Error: Could not extract information from this website.',
-      industry: '',
-      products: [], // Return empty products array to trigger error handling
-      websiteUrl: url,
-      extractedAt: new Date(),
-      location: {},
-      contactInfo: {}
-    };
   }
 } 

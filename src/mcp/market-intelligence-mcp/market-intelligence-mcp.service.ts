@@ -6,12 +6,22 @@ import {
   Competitor,
   TariffInfo
 } from './market-intelligence-mcp.interface';
+import { ProductCategory, ProductSubcategory } from '../../types/product-categories.types';
+import { productCategories } from '../../data/product-categories.data';
 import axios from 'axios';
 import { logger } from '@/utils/logger';
+
+class MCPError extends Error {
+  constructor(message: string, public readonly code: string) {
+    super(message);
+    this.name = 'MCPError';
+  }
+}
 
 export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
   private dataSourceUrls: Record<string, string>;
   private apiKeys: Record<string, string>;
+  private initialized: boolean = false;
   
   constructor() {
     // Initialize data source URLs
@@ -20,7 +30,7 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
       tariffData: process.env.TARIFF_API_URL || 'https://api.macmap.org/api/v1/tariffs',
       competitorData: process.env.COMPETITOR_API_URL || 'https://api.exportpotential.org/api/v1/competitors',
       unComtrade: 'https://comtrade.un.org/api/get',
-      perplexity: 'https://api.perplexity.ai'
+      perplexity: 'https://api.perplexity.ai/chat/completions'
     };
     
     // Initialize API keys
@@ -30,15 +40,70 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
       openai: process.env.OPENAI_API_KEY || ''
     };
     
-    logger.info('MarketIntelligenceMCPService initialized');
+    this.validateConfiguration();
+  }
+
+  private validateConfiguration() {
+    const missingKeys: string[] = [];
+    
     if (!this.apiKeys.unComtrade) {
-      logger.warn('UN Comtrade API key not found in environment variables');
+      missingKeys.push('UN_COMTRADE_API_KEY');
     }
     if (!this.apiKeys.perplexity) {
-      logger.warn('Perplexity API key not found in environment variables');
+      missingKeys.push('PERPLEXITY_API_KEY');
     }
     if (!this.apiKeys.openai) {
-      logger.warn('OpenAI API key not found in environment variables');
+      missingKeys.push('OPENAI_API_KEY');
+    }
+
+    if (missingKeys.length > 0) {
+      logger.warn(`Missing API keys: ${missingKeys.join(', ')}`);
+    } else {
+      this.initialized = true;
+      logger.info('MarketIntelligenceMCPService initialized successfully');
+    }
+  }
+
+  private async makeAPIRequest<T>(
+    url: string,
+    params: Record<string, any>,
+    apiKeyName: string,
+    errorContext: string
+  ): Promise<T> {
+    if (!this.initialized) {
+      throw new MCPError('Service not properly initialized', 'INITIALIZATION_ERROR');
+    }
+
+    try {
+      const headers: Record<string, string> = {};
+      if (apiKeyName === 'perplexity') {
+        headers['Authorization'] = `Bearer ${this.apiKeys.perplexity}`;
+      }
+
+      const response = await axios.get<T>(url, {
+        params,
+        headers,
+        timeout: 30000 // 30 second timeout
+      });
+
+      return response.data;
+    } catch (error: unknown) {
+      // Handle common Axios error cases
+      const axiosError = error as { response?: { status?: number }, code?: string };
+      
+      if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
+        throw new MCPError(`Invalid API key for ${apiKeyName}`, 'INVALID_API_KEY');
+      }
+      if (axiosError.response?.status === 404) {
+        throw new MCPError(`Resource not found: ${errorContext}`, 'NOT_FOUND');
+      }
+      if (axiosError.code === 'ECONNABORTED') {
+        throw new MCPError(`Request timeout: ${errorContext}`, 'TIMEOUT');
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Error in ${errorContext}: ${errorMessage}`);
+      throw new MCPError(`Failed to fetch ${errorContext}`, 'API_ERROR');
     }
   }
   
@@ -46,25 +111,59 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
     try {
       logger.info(`Getting market insights for ${request.productCategories.join(', ')} in markets ${request.targetMarkets.join(', ')}`);
       
+      if (!request.productCategories.length || !request.targetMarkets.length) {
+        throw new MCPError('Invalid request: missing product categories or target markets', 'INVALID_REQUEST');
+      }
+
       const marketInsights: Record<string, MarketInsight> = {};
+      const errors: Record<string, string> = {};
       
       // Process each target market
       for (const marketCode of request.targetMarkets) {
-        const marketInsight = await this.fetchMarketInsight(
-          marketCode,
-          request.productCategories,
-          request.businessProfile
-        );
-        
-        marketInsights[marketCode] = marketInsight;
+        try {
+          const marketInsight = await this.fetchMarketInsight(
+            marketCode,
+            request.productCategories,
+            request.businessProfile
+          );
+          marketInsights[marketCode] = marketInsight;
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          logger.error(`Failed to fetch insights for market ${marketCode}: ${errorMessage}`);
+          errors[marketCode] = errorMessage;
+          // Continue with other markets instead of failing completely
+          marketInsights[marketCode] = this.getFallbackMarketInsight(marketCode);
+        }
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        logger.warn('Some markets failed to fetch:', errors);
       }
       
       return marketInsights;
       
-    } catch (error) {
-      logger.error(`Error in MarketIntelligenceMCPService.getMarketInsights: ${error}`);
-      throw new Error('Failed to get market insights');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Error in MarketIntelligenceMCPService.getMarketInsights: ${errorMessage}`);
+      throw new MCPError('Failed to get market insights', 'SERVICE_ERROR');
     }
+  }
+
+  private getFallbackMarketInsight(marketCode: string): MarketInsight {
+    return {
+      marketSize: {
+        value: 0,
+        currency: 'USD',
+        year: new Date().getFullYear(),
+        growthRate: 0
+      },
+      topCompetitors: [],
+      entryBarriers: ['Data currently unavailable'],
+      tariffs: {},
+      opportunities: ['Market data temporarily unavailable'],
+      risks: ['Unable to assess risks due to data unavailability'],
+      recommendations: ['Please try again later for market-specific recommendations']
+    };
   }
   
   private async fetchMarketInsight(
@@ -73,28 +172,31 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
     businessProfile: any
   ): Promise<MarketInsight> {
     try {
-      // In a real implementation, this would call various APIs to gather market data
-      // For now, we'll use a mock implementation that returns realistic insights
-      
-      // Get market size data
+      // Get market size data based on specific categories
       const marketSize = await this.fetchMarketSize(marketCode, productCategories);
       
-      // Get competitor data
+      // Get competitor data specific to each category
       const topCompetitors = await this.fetchTopCompetitors(marketCode, productCategories);
       
-      // Get entry barriers
+      // Get category-specific entry barriers
       const entryBarriers = await this.fetchEntryBarriers(marketCode, productCategories);
       
-      // Get tariff information
+      // Get tariff information for each category
       const tariffs = await this.fetchTariffInfo(marketCode, productCategories);
       
-      // Generate opportunities, risks, and recommendations
-      const opportunities = await this.generateOpportunities(marketCode, productCategories, marketSize, topCompetitors);
+      // Generate insights based on category-specific data
+      const opportunities = await this.generateOpportunities(
+        marketCode,
+        productCategories,
+        marketSize,
+        topCompetitors
+      );
+
       const risks = this.generateRisks(marketCode, productCategories, entryBarriers, tariffs);
       const recommendations = this.generateRecommendations(
-        marketCode, 
-        productCategories, 
-        businessProfile, 
+        marketCode,
+        productCategories,
+        businessProfile,
         marketSize,
         topCompetitors,
         entryBarriers,
@@ -122,64 +224,225 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
       // Check if we have the UN Comtrade API key for real data
       if (this.apiKeys.unComtrade) {
         try {
-          // Use UN Comtrade API to get real market size data
           logger.info(`Fetching real market data from UN Comtrade for ${marketCode}`);
-          const hsCode = this.getHSCodeForProductCategory(productCategories[0]);
           
-          const response = await axios.get(this.dataSourceUrls.unComtrade, {
-            params: {
-              max: 5000,
-              type: 'C',
-              freq: 'A',
-              px: 'HS',
-              ps: new Date().getFullYear() - 1, // Previous year data
-              r: marketCode,
-              p: 'all', // All partner countries
-              rg: '1', // Imports
-              cc: hsCode,
-              fmt: 'json',
-              token: this.apiKeys.unComtrade
-            }
-          });
+          let totalValue = 0;
+          const categoryValues: Record<string, number> = {};
           
-          // Type check for dataset property
-          const responseData = response.data as any;
-          if (responseData && responseData.dataset && Array.isArray(responseData.dataset)) {
-            // Sum up the values from the dataset
-            const totalValue = responseData.dataset.reduce((sum: number, record: any) => sum + (record.TradeValue || 0), 0);
+          // Process each product category
+          for (const category of productCategories) {
+            // Get the HS codes for this category from our predefined categories
+            const hsCodesForCategory = this.getHSCodesForCategory(category);
+            let categoryValue = 0;
             
-            return {
-              value: totalValue,
-              currency: 'USD',
-              year: new Date().getFullYear() - 1,
-              growthRate: this.getMarketGrowthRate(marketCode)
-            };
+            // Fetch data for each HS code in the category
+            for (const hsCode of hsCodesForCategory) {
+              const response = await axios.get(this.dataSourceUrls.unComtrade, {
+                params: {
+                  max: 5000,
+                  type: 'C',
+                  freq: 'A',
+                  px: 'HS',
+                  ps: new Date().getFullYear() - 1,
+                  r: marketCode,
+                  p: 'all',
+                  rg: '1',
+                  cc: hsCode,
+                  fmt: 'json',
+                  token: this.apiKeys.unComtrade
+                }
+              });
+              
+              const responseData = response.data as any;
+              if (responseData?.dataset) {
+                const hsCodeValue = responseData.dataset.reduce(
+                  (sum: number, record: any) => sum + (record.TradeValue || 0),
+                  0
+                );
+                categoryValue += hsCodeValue;
+              }
+            }
+            
+            categoryValues[category] = categoryValue;
+            totalValue += categoryValue;
           }
+          
+          // Calculate growth rates for each category
+          const categoryGrowthRates: Record<string, number> = {};
+          for (const category of productCategories) {
+            categoryGrowthRates[category] = this.getCategoryGrowthRate(category, marketCode);
+          }
+          
+          // Calculate weighted average growth rate
+          const weightedGrowthRate = Object.entries(categoryValues).reduce((acc, [category, value]) => {
+            const weight = value / totalValue;
+            return acc + (categoryGrowthRates[category] * weight);
+          }, 0);
+          
+          return {
+            value: totalValue,
+            currency: 'USD',
+            year: new Date().getFullYear() - 1,
+            growthRate: weightedGrowthRate,
+            categoryBreakdown: categoryValues
+          };
+          
         } catch (apiError) {
           logger.error(`Error accessing UN Comtrade API: ${apiError}`);
           // Fall back to mock data
         }
       }
       
-      // Fallback to mock data
-      const baseValue = this.getBaseMarketValue(marketCode);
-      const growthRate = this.getMarketGrowthRate(marketCode);
-      
-      return {
-        value: baseValue,
-        currency: 'USD',
-        year: new Date().getFullYear(),
-        growthRate
-      };
+      // Fallback to mock data with category-specific values
+      const mockMarketSize = this.getMockMarketSize(marketCode, productCategories);
+      return mockMarketSize;
       
     } catch (error) {
-      logger.error(`Error fetching market size for ${marketCode}: ${error}`);
-      return {
-        value: 0,
-        currency: 'USD',
-        year: new Date().getFullYear()
-      };
+      logger.error(`Error in fetchMarketSize: ${error}`);
+      throw error;
     }
+  }
+  
+  private getHSCodesForCategory(category: string): string[] {
+    // Find the category in our predefined categories
+    const categoryData = productCategories.find(
+      (cat: ProductCategory) => cat.name.toLowerCase() === category.toLowerCase()
+    );
+
+    if (!categoryData) {
+      return [];
+    }
+
+    // Collect all HS codes from subcategories
+    const hsCodes: string[] = [];
+    categoryData.subcategories.forEach((sub: ProductSubcategory) => {
+      if (sub.hsCode) {
+        hsCodes.push(sub.hsCode);
+      }
+    });
+
+    return hsCodes;
+  }
+
+  private getCategoryGrowthRate(category: string, marketCode: string): number {
+    // Category-specific growth rates
+    const growthRates: Record<string, Record<string, number>> = {
+      'Food Products': {
+        'US': 3.2, 'CN': 6.5, 'DE': 2.1, 'UK': 2.4, 'default': 2.8
+      },
+      'Beverages': {
+        'US': 2.8, 'CN': 7.2, 'DE': 1.9, 'UK': 2.2, 'default': 2.5
+      },
+      'Ready-to-Wear': {
+        'US': 2.1, 'CN': 8.5, 'DE': 1.7, 'UK': 2.0, 'default': 2.3
+      },
+      'Jewellery': {
+        'US': 3.5, 'CN': 9.2, 'DE': 2.2, 'UK': 2.8, 'default': 3.0
+      },
+      'Home Goods': {
+        'US': 2.4, 'CN': 7.8, 'DE': 1.6, 'UK': 1.9, 'default': 2.1
+      },
+      'Non-Prescription Health': {
+        'US': 4.2, 'CN': 10.5, 'DE': 2.8, 'UK': 3.2, 'default': 3.5
+      }
+    };
+
+    const categoryRates = growthRates[category] || { default: 2.5 };
+    return categoryRates[marketCode] || categoryRates.default;
+  }
+
+  private getMockMarketSize(marketCode: string, categories: string[]): MarketSize {
+    const baseValue = this.getBaseMarketValue(marketCode);
+    const categoryValues: Record<string, number> = {};
+    let totalValue = 0;
+
+    // Category-specific market share percentages
+    const categoryShares: Record<string, number> = {
+      'Food Products': 0.25,
+      'Beverages': 0.20,
+      'Ready-to-Wear': 0.18,
+      'Jewellery': 0.12,
+      'Home Goods': 0.15,
+      'Non-Prescription Health': 0.10
+    };
+
+    // Calculate values for each category
+    categories.forEach(category => {
+      const share = categoryShares[category] || 0.1;
+      const value = baseValue * share;
+      categoryValues[category] = value;
+      totalValue += value;
+    });
+
+    // Calculate weighted growth rate
+    const weightedGrowthRate = categories.reduce((acc, category) => {
+      const categoryValue = categoryValues[category];
+      const weight = categoryValue / totalValue;
+      const growthRate = this.getCategoryGrowthRate(category, marketCode);
+      return acc + (growthRate * weight);
+    }, 0);
+
+    return {
+      value: totalValue,
+      currency: 'USD',
+      year: new Date().getFullYear() - 1,
+      growthRate: weightedGrowthRate,
+      categoryBreakdown: categoryValues
+    };
+  }
+  
+  private groupRelatedProducts(productDescriptions: string[]): Array<{primaryDescription: string, variants: string[]}> {
+    const groups: Array<{primaryDescription: string, variants: string[]}> = [];
+    const processedProducts = new Set<string>();
+    
+    for (const desc of productDescriptions) {
+      if (processedProducts.has(desc)) continue;
+      
+      const group = {
+        primaryDescription: desc,
+        variants: [desc]
+      };
+      
+      // Find related products
+      const baseWords = desc.toLowerCase().split(' ');
+      for (const otherDesc of productDescriptions) {
+        if (otherDesc === desc || processedProducts.has(otherDesc)) continue;
+        
+        const otherWords = otherDesc.toLowerCase().split(' ');
+        const commonWords = baseWords.filter(word => otherWords.includes(word));
+        
+        // If products share significant words and have similar characteristics, group them
+        if (commonWords.length >= 2 || this.areProductsRelated(desc, otherDesc)) {
+          group.variants.push(otherDesc);
+          processedProducts.add(otherDesc);
+        }
+      }
+      
+      groups.push(group);
+      processedProducts.add(desc);
+    }
+    
+    return groups;
+  }
+  
+  private areProductsRelated(product1: string, product2: string): boolean {
+    const p1Lower = product1.toLowerCase();
+    const p2Lower = product2.toLowerCase();
+    
+    // Check if they're variants of the same product
+    if (p1Lower.includes('flavor') || p2Lower.includes('flavor') ||
+        p1Lower.includes('variant') || p2Lower.includes('variant') ||
+        p1Lower.includes('pack') || p2Lower.includes('pack')) {
+      
+      // Extract base product name (before flavor/variant)
+      const base1 = p1Lower.split(/flavor|variant|pack/)[0].trim();
+      const base2 = p2Lower.split(/flavor|variant|pack/)[0].trim();
+      
+      // Check if base names are similar
+      return base1.includes(base2) || base2.includes(base1);
+    }
+    
+    return false;
   }
   
   private getBaseMarketValue(marketCode: string): number {
@@ -760,35 +1023,68 @@ export class MarketIntelligenceMCPService implements MarketIntelligenceMCP {
     return recommendations;
   }
   
-  private getHSCodeForProductCategory(category: string): string {
-    // Map product categories to HS codes (Harmonized System codes)
-    const hsCodeMap: Record<string, string> = {
-      'food': '16',
-      'beverage': '22',
-      'agricultural': '10',
-      'electronics': '85',
-      'electrical': '85',
-      'textile': '52',
-      'apparel': '61',
-      'clothing': '62',
-      'furniture': '94',
-      'automotive': '87',
-      'chemicals': '28',
-      'pharmaceuticals': '30',
-      'cosmetics': '33',
-      'toys': '95',
-      'jewelry': '71'
-    };
-    
-    // Find a matching HS code for the category
-    for (const [key, code] of Object.entries(hsCodeMap)) {
-      if (category.toLowerCase().includes(key)) {
-        return code;
+  private getHSCodeForProductCategory(productDescription: string): string {
+    try {
+      // First, try to identify storage type and product characteristics
+      const storageTypes = {
+        frozen: /frozen|freezer|ice cream|below 0°C/i,
+        chilled: /chilled|refrigerated|cool|between 0-4°C/i,
+        ambient: /shelf stable|room temperature|ambient/i
+      };
+
+      // Import product categories data
+      const { productCategories, hsCodeCategoryMap } = require('../../data/product-categories.data');
+
+      // Determine storage type
+      let storageType = 'ambient'; // default
+      for (const [type, pattern] of Object.entries(storageTypes)) {
+        if (pattern.test(productDescription)) {
+          storageType = type;
+          break;
+        }
       }
+
+      // Special case for known frozen products even if not explicitly marked as frozen
+      const implicitlyFrozenPattern = /(samosa|samoosa|spring.?roll|rissole)/i;
+      if (implicitlyFrozenPattern.test(productDescription)) {
+        storageType = 'frozen';
+      }
+
+      // Find matching category and subcategory
+      for (const category of productCategories) {
+        for (const subcategory of category.subcategories) {
+          // Check if product matches any examples or description
+          const matchesExample = subcategory.examples.some((example: string) => 
+            productDescription.toLowerCase().includes(example.toLowerCase())
+          );
+          const matchesDescription = productDescription.toLowerCase().includes(subcategory.description.toLowerCase());
+
+          if (matchesExample || matchesDescription) {
+            // For frozen foods, ensure we're using the frozen variant HS code
+            if (storageType === 'frozen' && !subcategory.id.includes('frozen')) {
+              // Try to find a frozen equivalent
+              const frozenSubcategory = productCategories
+                .find((cat: ProductCategory) => cat.id === 'food-products')
+                ?.subcategories.find((sub: ProductSubcategory) => sub.id === 'frozen-foods');
+              
+              return frozenSubcategory?.hsCode || '1904'; // Default frozen food HS code
+            }
+            return subcategory.hsCode;
+          }
+        }
+      }
+
+      // If no specific match found, use default codes based on storage type
+      switch(storageType) {
+        case 'frozen': return '1904'; // Frozen food preparations
+        case 'chilled': return '0407'; // Chilled products
+        default: return '2106'; // Food preparations n.e.s.
+      }
+      
+    } catch (error) {
+      logger.error(`Error determining HS code for ${productDescription}: ${error}`);
+      return '2106'; // Default to food preparations n.e.s.
     }
-    
-    // Default HS code for other categories
-    return 'TOTAL'; // TOTAL will get all HS codes
   }
   
   private getCountryName(countryCode: string): string {
