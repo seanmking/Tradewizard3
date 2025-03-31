@@ -2,117 +2,70 @@
 
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { 
-  BusinessProfile, 
-  Product, 
-  ProductionCapacity, 
-  MarketInfo, 
-  Certification, 
-  Budget 
-} from '@/contexts/assessment-context';
+  ReportData,
+  ReportFormat,
+  ReportGenerationConfig
+} from '@/types/report.types';
 import { ReportGeneratorService } from '@/services/report-generator/report-generator.service';
+import { PdfExportService } from '@/services/report-generator/pdf-export.service';
 import { useAssessment } from '@/contexts/assessment-context';
-
-export interface MarketOverviewInsight {
-  marketCode: string;
-  marketName: string;
-  marketSize: number;
-  marketCurrency: string;
-  growthRate: number;
-  keyCompetitors: Array<{
-    name: string;
-    marketShare: number;
-  }>;
-  entryBarriers: string[];
-  tariffInformation: string;
-}
-
-export interface CertificationRoadmapItem {
-  id: string;
-  name: string;
-  description: string;
-  priority: 'high' | 'medium' | 'low';
-  timeline: number;
-  cost: {
-    min: number;
-    max: number;
-    currency: string;
-  };
-  steps: string[];
-}
-
-export interface ResourceNeed {
-  type: 'financial' | 'human' | 'infrastructure' | 'knowledge';
-  description: string;
-  estimatedCost?: {
-    min: number;
-    max: number;
-    currency: string;
-  };
-  timeline?: number;
-  alternatives?: string[];
-}
-
-export interface ActionPlanItem {
-  id: string;
-  title: string;
-  description: string;
-  timeline: {
-    startMonth: number;
-    durationMonths: number;
-  };
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  dependencies?: string[];
-  resources?: string[];
-}
-
-export interface ReportData {
-  businessProfile: BusinessProfile;
-  selectedProducts: Product[];
-  productionCapacity: ProductionCapacity;
-  marketInfo: MarketInfo;
-  certifications: Certification[];
-  budget: Budget;
-  insights: {
-    marketOverview: MarketOverviewInsight[];
-    certificationRoadmap: CertificationRoadmapItem[];
-    resourceNeeds: ResourceNeed[];
-    actionPlan: ActionPlanItem[];
-  };
-  generatedAt: Date;
-  exportReadinessScore: number;
-}
+import { logger } from '@/utils/logger';
 
 interface ReportState {
   isGenerating: boolean;
-  reportData: ReportData | null;
   generationError: string | null;
+  reportData: ReportData | null;
+  exportFormat: ReportFormat;
+  generationConfig: ReportGenerationConfig;
 }
 
-type ReportAction = 
+type ReportAction =
   | { type: 'SET_GENERATING'; payload: boolean }
-  | { type: 'SET_REPORT_DATA'; payload: ReportData }
-  | { type: 'SET_GENERATION_ERROR'; payload: string | null };
+  | { type: 'SET_GENERATION_ERROR'; payload: string | null }
+  | { type: 'SET_REPORT_DATA'; payload: ReportData | null }
+  | { type: 'SET_EXPORT_FORMAT'; payload: ReportFormat }
+  | { type: 'SET_GENERATION_CONFIG'; payload: Partial<ReportGenerationConfig> };
+
+const initialGenerationConfig: ReportGenerationConfig = {
+  includeConfidenceScores: true,
+  prioritizeMarkets: [],
+  focusOnCertification: false,
+  costOptimization: false,
+  timelineOptimization: false,
+  includeRawData: false
+};
 
 const initialState: ReportState = {
   isGenerating: false,
+  generationError: null,
   reportData: null,
-  generationError: null
+  exportFormat: ReportFormat.HTML,
+  generationConfig: initialGenerationConfig
 };
 
 const ReportContext = createContext<{
   state: ReportState;
   dispatch: React.Dispatch<ReportAction>;
   generateReport: () => Promise<void>;
+  exportReport: (format: ReportFormat) => Promise<void>;
+  updateGenerationConfig: (config: Partial<ReportGenerationConfig>) => void;
 } | null>(null);
 
 function reportReducer(state: ReportState, action: ReportAction): ReportState {
   switch (action.type) {
     case 'SET_GENERATING':
       return { ...state, isGenerating: action.payload };
-    case 'SET_REPORT_DATA':
-      return { ...state, reportData: action.payload };
     case 'SET_GENERATION_ERROR':
       return { ...state, generationError: action.payload };
+    case 'SET_REPORT_DATA':
+      return { ...state, reportData: action.payload };
+    case 'SET_EXPORT_FORMAT':
+      return { ...state, exportFormat: action.payload };
+    case 'SET_GENERATION_CONFIG':
+      return { 
+        ...state, 
+        generationConfig: { ...state.generationConfig, ...action.payload } 
+      };
     default:
       return state;
   }
@@ -121,17 +74,37 @@ function reportReducer(state: ReportState, action: ReportAction): ReportState {
 export function ReportProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reportReducer, initialState);
   const { state: assessmentState } = useAssessment();
-  const reportGeneratorService = new ReportGeneratorService();
+  
+  // For development purposes, we can use mock data if needed
+  const useMockData = true; // Always use mock data until service integrations are ready
+  const reportGeneratorService = new ReportGeneratorService(useMockData);
+  const pdfExportService = new PdfExportService();
   
   const generateReport = async () => {
     dispatch({ type: 'SET_GENERATING', payload: true });
     dispatch({ type: 'SET_GENERATION_ERROR', payload: null });
     
     try {
-      const reportData = await reportGeneratorService.generateReport(assessmentState);
+      logger.info('Generating export readiness report');
+      
+      // Ensure businessProfile is defined before generating the report
+      if (!assessmentState.businessProfile) {
+        throw new Error('Business profile is required for report generation');
+      }
+      
+      const reportData = await reportGeneratorService.generateReport(
+        {
+          ...assessmentState,
+          // Ensure businessProfile is not undefined for the report generator
+          businessProfile: assessmentState.businessProfile
+        }, 
+        state.generationConfig
+      );
+      
       dispatch({ type: 'SET_REPORT_DATA', payload: reportData });
+      logger.info('Report generation completed successfully');
     } catch (error) {
-      console.error('Error generating report:', error);
+      logger.error('Error generating report:', error);
       dispatch({ 
         type: 'SET_GENERATION_ERROR', 
         payload: error instanceof Error ? error.message : 'Unknown error generating report'
@@ -141,8 +114,49 @@ export function ReportProvider({ children }: { children: ReactNode }) {
     }
   };
   
+  const exportReport = async (format: ReportFormat) => {
+    if (!state.reportData) {
+      dispatch({ 
+        type: 'SET_GENERATION_ERROR', 
+        payload: 'No report data available to export' 
+      });
+      return;
+    }
+    
+    try {
+      dispatch({ type: 'SET_EXPORT_FORMAT', payload: format });
+      logger.info(`Exporting report in ${format} format`);
+      
+      // Use the PdfExportService to generate the report in the selected format
+      const blob = await pdfExportService.exportReport(state.reportData, format);
+      
+      // Download the generated file
+      const fileName = `${state.reportData.businessProfile.name.replace(/\s+/g, '_')}_export_readiness_report`;
+      const extension = format.toLowerCase();
+      pdfExportService.downloadPdf(blob, `${fileName}.${extension}`);
+      
+      logger.info('Report export completed successfully');
+    } catch (error) {
+      logger.error('Error exporting report:', error);
+      dispatch({ 
+        type: 'SET_GENERATION_ERROR', 
+        payload: error instanceof Error ? error.message : 'Unknown error exporting report'
+      });
+    }
+  };
+  
+  const updateGenerationConfig = (config: Partial<ReportGenerationConfig>) => {
+    dispatch({ type: 'SET_GENERATION_CONFIG', payload: config });
+  };
+  
   return (
-    <ReportContext.Provider value={{ state, dispatch, generateReport }}>
+    <ReportContext.Provider value={{ 
+      state, 
+      dispatch, 
+      generateReport, 
+      exportReport,
+      updateGenerationConfig
+    }}>
       {children}
     </ReportContext.Provider>
   );

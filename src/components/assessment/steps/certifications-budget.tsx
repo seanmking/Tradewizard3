@@ -323,9 +323,24 @@ export function CertificationsBudgetStep() {
     
     dispatch({ type: 'SET_BUDGET', payload: updatedBudget });
     
-    // Here you would typically generate and display the report
-    console.log('Assessment completed!');
-    alert('Assessment completed! Your export readiness report is being generated.');
+    // Save assessment state to localStorage for persistence across page navigation
+    try {
+      localStorage.setItem('assessmentState', JSON.stringify({
+        businessProfile: state.businessProfile,
+        selectedProducts: state.selectedProducts,
+        productionCapacity: state.productionCapacity,
+        marketInfo: state.marketInfo,
+        certifications,
+        budget: updatedBudget
+      }));
+      console.log('Assessment state saved to localStorage');
+    } catch (error) {
+      console.error('Error saving assessment state:', error);
+    }
+    
+    // Navigate to the report page
+    console.log('Assessment completed! Redirecting to report page...');
+    window.location.href = '/report';
   };
 
   const handleBack = () => {

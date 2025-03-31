@@ -79,6 +79,7 @@ export interface ComplianceRequirement {
   referenceUrl?: string;
   exporterRegistration?: ExporterRegistrationRequirements;
   marketSpecificCompliance?: MarketSpecificCompliance[];
+  confidenceScore?: number;
 }
 
 export interface ComplianceMCPResponse {

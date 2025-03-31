@@ -33,6 +33,7 @@ export interface Product {
   subcategoryId: string;
   specifications: Record<string, string>;
   selected?: boolean;
+  confidenceScore?: number;
   suggestedCategory?: {
     categoryId: string;
     subcategoryId: string;

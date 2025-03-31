@@ -1,4 +1,4 @@
-import { ReportData } from '@/contexts/report-context';
+import { ReportData, ReportFormat } from '@/types/report.types';
 import { logger } from '@/utils/logger';
 
 // This is a placeholder implementation for PDF generation
@@ -8,28 +8,46 @@ export class PdfExportService {
     try {
       logger.info('Generating PDF export of export readiness report');
       
-      // In a real implementation, this would use a PDF library
-      // For now, we'll just create a simple placeholder that returns a Blob
-      
-      // Mock HTML content for the PDF
+      // Generate HTML content for the PDF
       const htmlContent = this.generateReportHtml(report);
       
-      // Convert HTML to PDF (in a real implementation)
-      // const pdfBlob = await html2pdf().from(htmlContent).outputPdf('blob');
-      
-      // For now, return a mock Blob
-      const mockPdfContent = `
-        Export Readiness Report
-        Generated: ${report.generatedAt.toISOString()}
-        Business: ${report.businessProfile.name}
-        Export Readiness Score: ${report.exportReadinessScore}/100
-      `;
-      
-      const blob = new Blob([mockPdfContent], { type: 'application/pdf' });
+      // In a real implementation, we would use html2pdf or similar library
+      // For now, we'll create a simple blob with the content
+      const blob = new Blob([htmlContent], { type: 'application/pdf' });
       return blob;
     } catch (error) {
       logger.error(`Error generating PDF: ${error}`);
       throw new Error(`Failed to generate PDF report: ${error}`);
+    }
+  }
+  
+  async generateHtml(report: ReportData): Promise<Blob> {
+    try {
+      logger.info('Generating HTML export of export readiness report');
+      
+      // Generate HTML content
+      const htmlContent = this.generateReportHtml(report);
+      
+      // Create an HTML blob
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      return blob;
+    } catch (error) {
+      logger.error(`Error generating HTML: ${error}`);
+      throw new Error(`Failed to generate HTML report: ${error}`);
+    }
+  }
+  
+  async exportReport(report: ReportData, format: ReportFormat): Promise<Blob> {
+    switch (format) {
+      case ReportFormat.PDF:
+        return this.generatePdf(report);
+      case ReportFormat.HTML:
+        return this.generateHtml(report);
+      case ReportFormat.JSON:
+        const jsonString = JSON.stringify(report, null, 2);
+        return new Blob([jsonString], { type: 'application/json' });
+      default:
+        return this.generatePdf(report);
     }
   }
   
@@ -61,6 +79,8 @@ export class PdfExportService {
           <h2>${report.businessProfile.name}</h2>
           <p>Generated: ${report.generatedAt.toLocaleDateString()}</p>
           <div class="score">Export Readiness Score: ${report.exportReadinessScore}/100</div>
+          ${report.overallConfidenceScore ? 
+            `<div>Overall Confidence Score: ${(report.overallConfidenceScore * 100).toFixed(1)}%</div>` : ''}
         </div>
         
         <div class="section">
@@ -80,105 +100,134 @@ export class PdfExportService {
               <th>Description</th>
             </tr>
             ${report.selectedProducts.map(product => `
-              <tr>
-                <td>${product.name}</td>
-                <td>${product.category}</td>
-                <td>${product.description}</td>
-              </tr>
+            <tr>
+              <td>${product.name}</td>
+              <td>${product.category}</td>
+              <td>${product.description}</td>
+            </tr>
             `).join('')}
           </table>
         </div>
         
         <div class="section">
           <h2>Target Markets</h2>
-          <table>
-            <tr>
-              <th>Market</th>
-              <th>Code</th>
-            </tr>
+          <ul>
             ${report.marketInfo.targetMarkets.map(market => `
-              <tr>
-                <td>${market.name}</td>
-                <td>${market.code}</td>
-              </tr>
+            <li>${market.name} (${market.code})</li>
             `).join('')}
-          </table>
+          </ul>
         </div>
         
         <div class="section">
           <h2>Market Overview</h2>
-          ${report.insights.marketOverview.map(market => `
-            <h3>${market.marketName} (${market.marketCode})</h3>
+          ${report.marketOverview.map(market => `
+          <div class="market-overview">
+            <h3>${market.marketName}</h3>
             <p><strong>Market Size:</strong> ${market.marketSize.toLocaleString()} ${market.marketCurrency}</p>
             <p><strong>Growth Rate:</strong> ${market.growthRate}%</p>
-            <p><strong>Key Competitors:</strong></p>
+            <h4>Key Competitors</h4>
             <ul>
               ${market.keyCompetitors.map(competitor => `
-                <li>${competitor.name} (${competitor.marketShare}% market share)</li>
+              <li>${competitor.name} (Market Share: ${competitor.marketShare}%)</li>
               `).join('')}
             </ul>
-            <p><strong>Entry Barriers:</strong></p>
+            <h4>Entry Barriers</h4>
             <ul>
               ${market.entryBarriers.map(barrier => `<li>${barrier}</li>`).join('')}
             </ul>
-            <p><strong>Tariff Information:</strong> ${market.tariffInformation}</p>
+            <h4>Opportunities</h4>
+            <ul>
+              ${market.opportunities.map(opportunity => `<li>${opportunity}</li>`).join('')}
+            </ul>
+            <h4>Risks</h4>
+            <ul>
+              ${market.risks.map(risk => `<li>${risk}</li>`).join('')}
+            </ul>
+          </div>
           `).join('')}
         </div>
         
         <div class="section">
           <h2>Certification Roadmap</h2>
+          <p><strong>Total Estimated Cost:</strong> ${report.certificationRoadmap.totalEstimatedCost.min.toLocaleString()} - ${report.certificationRoadmap.totalEstimatedCost.max.toLocaleString()} ${report.certificationRoadmap.totalEstimatedCost.currency}</p>
+          <p><strong>Total Timeline:</strong> ${Math.round(report.certificationRoadmap.totalEstimatedTimelineInDays / 30)} months</p>
+          
           <table>
             <tr>
               <th>Certification</th>
-              <th>Priority</th>
-              <th>Timeline (days)</th>
+              <th>Market</th>
               <th>Estimated Cost</th>
+              <th>Timeline (Days)</th>
             </tr>
-            ${report.insights.certificationRoadmap.map(cert => `
-              <tr>
-                <td>${cert.name}</td>
-                <td>${cert.priority}</td>
-                <td>${cert.timeline}</td>
-                <td>${cert.cost.min} - ${cert.cost.max} ${cert.cost.currency}</td>
-              </tr>
+            ${report.certificationRoadmap.requirements.map(cert => `
+            <tr>
+              <td>${cert.name}</td>
+              <td>${cert.marketName}</td>
+              <td>${cert.estimatedCost.min.toLocaleString()} - ${cert.estimatedCost.max.toLocaleString()} ${cert.estimatedCost.currency}</td>
+              <td>${cert.estimatedTimelineInDays}</td>
+            </tr>
             `).join('')}
           </table>
         </div>
         
         <div class="section">
           <h2>Resource Needs</h2>
-          ${report.insights.resourceNeeds.map(resource => `
-            <h3>${resource.type.charAt(0).toUpperCase() + resource.type.slice(1)} Resources: ${resource.description}</h3>
-            <p><strong>Estimated Cost:</strong> ${
-              resource.estimatedCost ? 
-              `${resource.estimatedCost.min} - ${resource.estimatedCost.max} ${resource.estimatedCost.currency}` : 
-              'N/A'
-            }</p>
-            <p><strong>Timeline:</strong> ${resource.timeline || 'N/A'} months</p>
-            <p><strong>Alternatives:</strong></p>
+          ${report.resourceNeeds.resourceNeeds.map(resource => `
+          <div class="resource">
+            <h3>${resource.name}</h3>
+            <p><strong>Type:</strong> ${resource.type}</p>
+            <p><strong>Description:</strong> ${resource.description}</p>
+            <p><strong>Priority:</strong> ${resource.priority}</p>
+            <p><strong>Timeline:</strong> ${resource.timeline}</p>
+            ${resource.estimatedCost ? `<p><strong>Estimated Cost:</strong> ${resource.estimatedCost.min.toLocaleString()} - ${resource.estimatedCost.max.toLocaleString()} ${resource.estimatedCost.currency}</p>` : ''}
+            ${resource.alternativeOptions && resource.alternativeOptions.length > 0 ? `
+            <p><strong>Alternative Options:</strong></p>
             <ul>
-              ${(resource.alternatives || []).map(alt => `<li>${alt}</li>`).join('')}
+              ${resource.alternativeOptions.map(alt => `<li>${alt}</li>`).join('')}
             </ul>
+            ` : ''}
+          </div>
           `).join('')}
+          
+          <h3>Production Capacity Analysis</h3>
+          <p><strong>Current Capacity:</strong> ${report.resourceNeeds.productionCapacityAnalysis.currentCapacity}</p>
+          <p><strong>Required Capacity:</strong> ${report.resourceNeeds.productionCapacityAnalysis.requiredCapacity}</p>
+          <p><strong>Capacity Gap:</strong> ${report.resourceNeeds.productionCapacityAnalysis.capacityGap}</p>
         </div>
         
         <div class="section">
           <h2>Action Plan</h2>
+          ${report.actionPlan.actionItems.map(action => `
+          <div class="action-item">
+            <h3>${action.name}</h3>
+            <p><strong>Description:</strong> ${action.description}</p>
+            <p><strong>Priority:</strong> ${action.priority}</p>
+            <p><strong>Timeline:</strong> Day ${action.timeline.startDay} - ${action.timeline.startDay + action.timeline.durationDays} (${action.timeline.durationDays} days)</p>
+            ${action.dependsOn.length > 0 ? `<p><strong>Dependencies:</strong> ${action.dependsOn.join(', ')}</p>` : ''}
+            ${action.resources.length > 0 ? `
+            <p><strong>Resources:</strong></p>
+            <ul>
+              ${action.resources.map(resource => `<li>${resource}</li>`).join('')}
+            </ul>
+            ` : ''}
+          </div>
+          `).join('')}
+          
+          <h3>Risk Assessment</h3>
           <table>
             <tr>
-              <th>Action</th>
-              <th>Timeline</th>
-              <th>Priority</th>
+              <th>Risk Factor</th>
+              <th>Probability</th>
+              <th>Impact</th>
+              <th>Mitigation</th>
             </tr>
-            ${report.insights.actionPlan.map(action => `
-              <tr>
-                <td>
-                  <strong>${action.title}</strong><br>
-                  ${action.description}
-                </td>
-                <td>Month ${action.timeline.startMonth} - ${action.timeline.startMonth + action.timeline.durationMonths}</td>
-                <td>${action.priority}</td>
-              </tr>
+            ${report.actionPlan.riskAssessment.map(risk => `
+            <tr>
+              <td>${risk.name}</td>
+              <td>${risk.probability}</td>
+              <td>${risk.impact}</td>
+              <td>${risk.mitigationStrategy}</td>
+            </tr>
             `).join('')}
           </table>
         </div>
@@ -188,7 +237,7 @@ export class PdfExportService {
           <table>
             <tr>
               <th>Category</th>
-              <th>Allocation (%)</th>
+              <th>Allocation</th>
             </tr>
             <tr>
               <td>Certifications</td>
@@ -220,21 +269,31 @@ export class PdfExportService {
     `;
   }
   
-  downloadPdf(blob: Blob, filename: string = 'export-readiness-report.pdf'): void {
-    // Create a link element to trigger the download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    
-    // Append to the document, click, and remove
-    document.body.appendChild(a);
-    a.click();
-    
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
+  // Method to download the generated blob as a file
+  downloadPdf(blob: Blob, fileName: string): void {
+    try {
+      logger.info(`Downloading report as ${fileName}`);
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      
+      // Append to the document, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      logger.info('Download initiated successfully');
+    } catch (error) {
+      logger.error(`Error downloading file: ${error}`);
+      throw new Error(`Failed to download report: ${error}`);
+    }
   }
 } 
