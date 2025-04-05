@@ -1,0 +1,21 @@
+{
+  "extension": {
+    "enableBackgroundIndexing": false,
+    "memoryLimit": 4096
+  },
+  "ai": {
+    "memoryLimit": 4096
+  },
+  "typescript": {
+    "memoryLimit": 4096,
+    "useLocalTsdk": true
+  },
+  "workspace": {
+    "excludeDirectories": [
+      "node_modules",
+      ".next",
+      "dist",
+      "build"
+    ]
+  }
+} 

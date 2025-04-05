@@ -1,0 +1,104 @@
+// WITS Data Schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model HSCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  level         String   // chapter, heading, or subheading
+  description   String
+  parentCode    String?
+  examples      String[]
+  searchTerms   String[]
+  version       String
+  lastVerified  DateTime
+  staleLevel    String   // fresh, warning, or critical
+  source        String   // api, fallback, or user
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  parent        HSCode?  @relation("Hierarchy", fields: [parentCode], references: [code])
+  children      HSCode[] @relation("Hierarchy")
+  tariffData    TariffData[]
+  changeLog     ChangeLogEntry[]
+  
+  @@index([code])
+  @@index([parentCode])
+  @@index([lastVerified])
+}
+
+model TariffData {
+  id            String   @id @default(cuid())
+  hsCode        String
+  importerCode  String
+  exporterCode  String
+  rate          Float
+  effectiveDate DateTime
+  expiryDate    DateTime?
+  restrictions  String[]
+  quotas        Json?    // Stored as JSON for flexibility
+  lastVerified  DateTime
+  version       String
+  
+  // Relationships
+  hsCodeRef     HSCode   @relation(fields: [hsCode], references: [code])
+  
+  @@unique([hsCode, importerCode, exporterCode])
+  @@index([hsCode])
+  @@index([lastVerified])
+}
+
+model ChangeLogEntry {
+  id            String   @id @default(cuid())
+  hsCode        String
+  type          String   // update, delete, create
+  changes       Json     // Stored as JSON array of changes
+  isCritical    Boolean
+  version       String
+  createdAt     DateTime @default(now())
+  
+  // Relationships
+  hsCodeRef     HSCode   @relation(fields: [hsCode], references: [code])
+  
+  @@index([hsCode])
+  @@index([createdAt])
+  @@index([isCritical])
+}
+
+model QueueItem {
+  id            String   @id @default(cuid())
+  hsCode        String
+  operation     String   // fetch, update, verify
+  priority      Int
+  retryCount    Int     @default(0)
+  lastError     String?
+  status        String   // pending, processing, completed, failed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model Metrics {
+  id                String   @id @default(cuid())
+  timestamp         DateTime @default(now())
+  queueSize         Int
+  processedCount    Int
+  errorCount        Int
+  averageLatency    Float
+  cacheHitRate      Float
+  apiCallCount      Int
+  apiErrorCount     Int
+  
+  @@index([timestamp])
+} 
